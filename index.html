@@ -5,208 +5,161 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <title>Котострофа: Легенды Сада</title>
+    
     <style>
-        /* Подключаем ОДИН хороший, читаемый шрифт */
+        /* ПОДКЛЮЧЕНИЕ ШРИФТОВ */
         @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bangers&display=swap');
 
+        /* --- GLOBAL --- */
         :root {
-            --ui-scale: 1; /* Базовый масштаб интерфейса */
+            --ui-scale: 1;
         }
 
         body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #2d9e6d;
-            /* ИСПОЛЬЗУЕМ ТОЛЬКО Fredoka One, без cursive */
+            margin: 0; overflow: hidden; background-color: #2d9e6d;
+            /* ВАЖНО: Только читаемый шрифт, никаких завитушек */
             font-family: 'Fredoka One', sans-serif;
-            color: white;
-            user-select: none;
-            touch-action: none;
-            /* Фикс для iOS, чтобы не выделялся текст при тапах */
+            color: white; user-select: none; touch-action: none;
             -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
         }
-
         canvas { display: block; width: 100%; height: 100%; }
 
-        /* --- СООБЩЕНИЕ О ПОВОРОТЕ ЭКРАНА --- */
+        /* --- ЭКРАН "ПОВЕРНИ ТЕЛЕФОН" --- */
         #rotate-message {
-            display: none; /* По умолчанию скрыто */
+            display: none;
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(44, 62, 80, 0.95); color: #f1c40f;
-            z-index: 9999; flex-direction: column; justify-content: center; align-items: center;
-            text-align: center; padding: 20px; box-sizing: border-box;
+            background: #2c3e50; z-index: 9999;
+            flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; color: #f1c40f; padding: 20px; box-sizing: border-box;
         }
-        #rotate-message span { font-size: 60px; margin-bottom: 20px; animation: rotatePhone 2s infinite ease-in-out; display: inline-block; }
-        @keyframes rotatePhone { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
-
-        /* ПОКАЗЫВАТЬ сообщение ТОЛЬКО на узких вертикальных экранах */
-        @media screen and (orientation: portrait) and (max-width: 768px) {
+        #rotate-message span { font-size: 60px; margin-bottom: 20px; animation: rot 2s infinite ease-in-out; display: block; }
+        @keyframes rot { 0% {transform: rotate(0deg);} 50% {transform: rotate(90deg);} 100% {transform: rotate(0deg);} }
+        
+        /* Показываем сообщение только на вертикальных экранах */
+        @media screen and (orientation: portrait) {
             #rotate-message { display: flex; }
         }
 
-        /* --- АДАПТАЦИЯ ИНТЕРФЕЙСА ДЛЯ МОБИЛЬНЫХ --- */
-        /* Если экран узкий (телефон в портрете или просто маленький экран) - уменьшаем масштаб UI */
-        @media (max-width: 768px) {
-            :root { --ui-scale: 0.75; /* Уменьшаем интерфейс до 75% */ }
+        /* --- АДАПТАЦИЯ UI ДЛЯ IPHONE --- */
+        @media (max-width: 900px) {
+            :root { --ui-scale: 0.8; } /* Уменьшаем весь интерфейс */
+            /* Исправляем шрифт заголовков, чтобы не был огромным */
+            h1 { font-size: 28px !important; } 
             
-            /* Дополнительно уменьшаем специфические элементы, которые мешают */
-            #joystick-area { width: 120px !important; height: 120px !important; bottom: 30px !important; left: 30px !important; }
-            .joy-stick { width: 40px !important; height: 40px !important; }
-            #minimap-container { width: 150px !important; height: 150px !important; bottom: 70px !important; /* Поднимаем над джойстиком если они перекрываются */ }
+            /* Джойстик чуть выше и меньше */
+            #joystick-area { bottom: 30px !important; left: 30px !important; width: 130px !important; height: 130px !important; }
+            .joy-stick { width: 45px !important; height: 45px !important; }
             
-            h1 { font-size: 28px !important; } /* Уменьшаем заголовки в меню */
-            .card { width: 130px !important; padding: 10px !important; } /* Уменьшаем карточки */
-            .card-icon { font-size: 28px !important; }
-            .card-title { font-size: 13px !important; }
+            /* Миникарта выше, чтобы не перекрывалась пальцем */
+            #minimap-container { width: 150px !important; height: 150px !important; bottom: 30px !important; right: 30px !important; }
+            
+            /* Карточки выбора меньше */
+            .card { width: 130px !important; padding: 10px !important; }
+            .card-icon { font-size: 30px !important; }
+            .card-title { font-size: 14px !important; }
+        }
+        
+        /* --- UI LAYERS --- */
+        #ui-layer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; 
+            transform: scale(var(--ui-scale)); transform-origin: top left;
+            width: calc(100% / var(--ui-scale)); height: calc(100% / var(--ui-scale));
+        }
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(26, 26, 46, 0.95);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 10; pointer-events: auto;
+            padding-bottom: 20px; /* Отступ для safe-area */
         }
 
-
-        /* UI LAYER */
-        #ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
-            /* Применяем масштаб ко всему UI */
-            transform: scale(var(--ui-scale)); transform-origin: top left; width: calc(100% / var(--ui-scale)); height: calc(100% / var(--ui-scale));
+        /* --- ВИДЕО ИНТРО --- */
+        #intro-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 200; display: none;
+            justify-content: center; align-items: center; pointer-events: auto;
         }
-
-        /* HUD */
-        .hud-top {
-            position: absolute; top: 10px; left: 20px; right: 20px;
-            display: flex; justify-content: space-between; align-items: flex-start;
+        #intro-video { width: 100%; height: 100%; object-fit: cover; }
+        #start-btn-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 201;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
+        .big-start-btn {
+            font-family: 'Bangers', sans-serif; font-size: 40px; color: #f1c40f;
+            padding: 20px 50px; border: 5px solid #fff; background: #c0392b;
+            cursor: pointer; animation: pulseBtn 1s infinite;
+            text-transform: uppercase; letter-spacing: 2px; border-radius: 10px;
+        }
+        .skip-video-btn {
+            position: absolute; bottom: 40px; right: 40px;
+            color: rgba(255,255,255,0.7); font-family: sans-serif; font-size: 16px;
+            cursor: pointer; z-index: 202; border: 1px solid rgba(255,255,255,0.3);
+            padding: 10px 20px; background: rgba(0,0,0,0.5); border-radius: 20px;
+        }
+        @keyframes pulseBtn { 0% {transform: scale(1);} 50% {transform: scale(1.05);} 100% {transform: scale(1);} }
+
+        /* --- HUD --- */
+        .hud-top { position: absolute; top: 10px; left: 20px; right: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
         .hud-left { display: flex; flex-direction: column; gap: 5px; width: 220px; }
         .hud-center { text-align: center; pointer-events: auto; }
-        
-        .hud-stats {
-            display: flex; gap: 15px; justify-content: center;
-            background: rgba(0,0,0,0.6); padding: 5px 15px;
-            border-radius: 20px; margin-top: 5px; font-size: 16px; border: 1px solid #444;
-        }
-
-        .bar-container {
-            background: rgba(0, 0, 0, 0.6);
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            border-radius: 8px; height: 22px; width: 100%;
-            overflow: hidden; position: relative;
-        }
+        .bar-container { background: rgba(0, 0, 0, 0.6); border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 8px; height: 22px; width: 100%; overflow: hidden; position: relative; }
         .hp-bar { background: linear-gradient(90deg, #ff4757, #ff6b81); width: 100%; height: 100%; transition: width 0.2s; }
         .xp-bar { background: linear-gradient(90deg, #2ed573, #7bed9f); width: 0%; height: 100%; transition: width 0.2s; }
         .bar-text { position: absolute; width: 100%; text-align: center; top: 2px; font-size: 12px; text-shadow: 1px 1px 1px black; z-index: 2; }
-
+        .hud-stats { display: flex; gap: 15px; justify-content: center; background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 20px; margin-top: 5px; font-size: 16px; border: 1px solid #444; }
         #game-timer { font-size: 32px; text-shadow: 0 0 10px #000; color: #f1c40f; letter-spacing: 2px; }
-
-        /* MINIMAP */
-        #minimap-container {
-            position: absolute; bottom: 20px; right: 20px;
-            width: 200px; height: 200px;
-            background: rgba(46, 204, 113, 0.3);
-            border: 4px solid #fff; border-radius: 50%; overflow: hidden;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5); backdrop-filter: blur(5px);
-            pointer-events: auto; /* Чтобы карта не пропускала нажатия на джойстик под ней */
+        
+        #minimap-container { 
+            position: absolute; bottom: 20px; right: 20px; width: 200px; height: 200px; 
+            background: rgba(46, 204, 113, 0.3); border: 4px solid #fff; border-radius: 50%; overflow: hidden; 
+            box-shadow: 0 0 15px rgba(0,0,0,0.5); backdrop-filter: blur(5px); pointer-events: auto;
         }
         #minimap { width: 100%; height: 100%; display: block; }
 
-        /* INTRO COMIC */
-        #intro-screen {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center;
-            padding: 20px; text-align: center; pointer-events: auto;
-        }
-        .slide { display: none; max-width: 600px; animation: fadeIn 1s; }
-        .slide.active { display: block; }
-        .slide-img { font-size: 80px; margin-bottom: 20px; }
-        .slide-text { font-size: 24px; line-height: 1.5; color: #ecf0f1; margin-bottom: 30px; }
-        .skip-btn { position: absolute; bottom: 20px; right: 20px; color: #7f8c8d; cursor: pointer; font-size: 14px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* SCREENS */
-        .screen {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(26, 26, 46, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 10; pointer-events: auto; padding-bottom: 40px; /* Отступ снизу для мобилок */
-        }
-
-        h1 { color: #ffa502; font-size: 40px; margin: 0 0 10px 0; text-shadow: 3px 3px 0 #000; font-family: 'Fredoka One', sans-serif; }
-        h2 { margin-bottom: 20px; color: #ced6e0; font-size: 18px; font-family: 'Fredoka One', sans-serif; }
-
-        .cards-container {
-            display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;
-            max-width: 900px; max-height: 70vh; overflow-y: auto; padding: 10px;
-             /* Добавляем инерционную прокрутку для iOS */
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .card {
-            background: #30336b; border: 3px solid #535c68; border-radius: 12px; padding: 15px; width: 160px;
-            cursor: pointer; text-align: center; position: relative; transition: 0.2s;
-        }
+        /* CARDS */
+        .cards-container { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: 900px; max-height: 70vh; overflow-y: auto; padding: 10px; -webkit-overflow-scrolling: touch; }
+        .card { background: #30336b; border: 3px solid #535c68; border-radius: 12px; padding: 15px; width: 160px; cursor: pointer; text-align: center; position: relative; transition: 0.2s; }
         .card:hover { transform: translateY(-5px); border-color: #f1c40f; background: #4834d4; }
         .card.rare { border-color: #e056fd; background: #2c0e3a; box-shadow: 0 0 15px #e056fd; }
         .card.mega { border-color: #ff4757; background: #5a0e16; box-shadow: 0 0 20px #ff4757; animation: pulse 1s infinite; }
-        
         .card-icon { font-size: 35px; margin-bottom: 8px; display: block; }
         .card-title { font-size: 15px; color: #f1c40f; margin-bottom: 5px; font-weight: bold; }
         .card-desc { font-size: 11px; color: #dff9fb; line-height: 1.3; }
         .rare-badge { position: absolute; top: -10px; right: -10px; background: #e056fd; font-size: 10px; padding: 3px 8px; border-radius: 10px; transform: rotate(15deg); }
-
-        .btn {
-            background: #f39c12; color: #fff; border: 3px solid #fff; padding: 12px 30px; font-size: 20px; border-radius: 30px;
-            cursor: pointer; font-family: inherit; margin-top: 15px; box-shadow: 0 5px 0 #d35400; transition: 0.1s;
-        }
+        .btn { background: #f39c12; color: #fff; border: 3px solid #fff; padding: 12px 30px; font-size: 20px; border-radius: 30px; cursor: pointer; font-family: inherit; margin-top: 15px; box-shadow: 0 5px 0 #d35400; transition: 0.1s; }
         .btn:active { transform: translateY(5px); box-shadow: 0 0 0 #d35400; }
 
-        #joystick-area {
-            position: absolute; bottom: 50px; left: 50px; width: 150px; height: 150px;
-            pointer-events: auto; display: none;
-        }
-        .joy-base {
-            width: 100%; height: 100%; background: rgba(255,255,255,0.1);
-            border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; position: relative;
-        }
-        .joy-stick {
-            width: 50px; height: 50px; background: #f1c40f; border-radius: 50%;
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        }
-
-        #pickup-msg {
-            position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 28px; font-weight: bold; text-shadow: 2px 2px 4px #000;
-            color: #f1c40f; opacity: 0; pointer-events: none;
-        }
+        /* JOYSTICK */
+        #joystick-area { position: absolute; bottom: 50px; left: 50px; width: 150px; height: 150px; pointer-events: auto; display: none; }
+        .joy-base { width: 100%; height: 100%; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; position: relative; }
+        .joy-stick { width: 50px; height: 50px; background: #f1c40f; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        #pickup-msg { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); font-size: 28px; font-weight: bold; text-shadow: 2px 2px 4px #000; color: #f1c40f; opacity: 0; pointer-events: none; }
+        #altar-warning { position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: #ff4757; text-align: center; text-shadow: 2px 2px 0 #000; display: none; animation: flash 1s infinite; }
         
-        #altar-warning {
-             position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%);
-             font-size: 24px; color: #ff4757; text-align: center; text-shadow: 2px 2px 0 #000;
-             display: none; animation: flash 1s infinite;
-        }
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.05);} 100% {transform: scale(1);} }
         @keyframes flash { 0% {opacity:1} 50% {opacity:0.5} 100% {opacity:1} }
     </style>
 </head>
 <body>
 
     <div id="rotate-message">
-        <span>📱🔄</span>
+        <span>🔄</span>
         <h1>Пожалуйста, поверните устройство!</h1>
-        <p>Игра лучше всего работает в горизонтальном режиме.</p>
+        <p>Для комфортной игры нужен горизонтальный режим</p>
     </div>
 
-    <div id="intro-screen" style="display:none;">
-        <div class="slide active" onclick="nextSlide()">
-            <div class="slide-img">🌑</div>
-            <div class="slide-text">В 2025 году тьма сгустилась над старым садом...<br>Пылевые Кролики и Овощи-Мутанты восстали.</div>
-            <div class="btn">Далее...</div>
+    <div id="intro-container">
+        <div id="start-btn-overlay">
+            <h1 style="font-family: 'Bangers', sans-serif; font-size: 60px; color: white; margin-bottom: 20px;">КОТОСТРОФА</h1>
+            <div class="big-start-btn" onclick="playVideo()">▶ СМОТРЕТЬ ИСТОРИЮ</div>
+            <div style="color: #ccc; margin-top: 15px; cursor: pointer; text-decoration: underline;" onclick="skipVideo()">Пропустить в меню</div>
         </div>
-        <div class="slide" onclick="nextSlide()">
-            <div class="slide-img">🐈</div>
-            <div class="slide-text">Люди спали и ничего не видели.<br>Но коты... Коты видели всё.</div>
-            <div class="btn">Далее...</div>
-        </div>
-        <div class="slide" onclick="nextSlide()">
-            <div class="slide-img">⚔️</div>
-            <div class="slide-text">Взяв лазерные указки и клубки,<br>пушистый отряд вышел на тропу войны.</div>
-            <div class="btn">В БОЙ!</div>
-        </div>
-        <div class="skip-btn" onclick="startGameFlow()">Пропустить</div>
+        <video id="intro-video" playsinline>
+            <source src="intro.mp4" type="video/mp4">
+        </video>
+        <div class="skip-video-btn" onclick="skipVideo()" style="display:none;" id="skip-btn-active">ПРОПУСТИТЬ >></div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -232,7 +185,7 @@
                     <span id="kill-count">💀 0</span>
                 </div>
             </div>
-            <div class="hud-left" style="opacity: 0; pointer-events: none;"></div>
+            <div class="hud-left" style="opacity:0; pointer-events: none;"></div>
         </div>
         
         <div id="minimap-container">
@@ -251,12 +204,12 @@
         <h1>ВЫБОР ГЕРОЯ</h1>
         <div class="cards-container">
             <div class="card" onclick="game.start('mainecoon')"><span class="card-icon">🦁</span><div class="card-title">Мейн-кун</div><div class="card-desc">Танк. Много HP.<br>Оружие: Лапа</div></div>
-            <div class="card" onclick="game.start('sphynx')"><span class="card-icon">👽</span><div class="card-title">Сфинкс</div><div class="card-desc">Скорость.<br>Оружие: Лазер</div></div>
             <div class="card" onclick="game.start('tabby')"><span class="card-icon">😼</span><div class="card-title">Полосатый</div><div class="card-desc">Баланс.<br>Оружие: Клубок</div></div>
             <div class="card" onclick="game.start('black')"><span class="card-icon">🐈‍⬛</span><div class="card-title">Черный</div><div class="card-desc">Удача и Крит.<br>Оружие: Когти</div></div>
             <div class="card" onclick="game.start('siamese')"><span class="card-icon">✨</span><div class="card-title">Сиамский</div><div class="card-desc">Маг. Область +20%.<br>Оружие: Аура</div></div>
-            <div class="card" onclick="game.start('ragdoll')"><span class="card-icon">🧶</span><div class="card-title">Рэгдолл</div><div class="card-desc">Броня. Возврат урона.<br>Оружие: Бомба</div></div>
-            <div class="card" onclick="game.start('persian')"><span class="card-icon">👑</span><div class="card-title">Перс</div><div class="card-desc">Ленивый. Реген HP.<br>Оружие: Рыба</div></div>
+            <div class="card" onclick="game.start('siberian')"><span class="card-icon">❄️</span><div class="card-title">Сибирский</div><div class="card-desc">Мороз. Контроль.<br>Оружие: Вьюга</div></div>
+            <div class="card" onclick="game.start('british')"><span class="card-icon">☕</span><div class="card-title">Британец</div><div class="card-desc">Аристократ.<br>Оружие: Чай (AoE)</div></div>
+            <div class="card" onclick="game.start('munchkin')"><span class="card-icon">🗡️</span><div class="card-title">Манчкин</div><div class="card-desc">Ближний бой.<br>Оружие: Кортик</div></div>
         </div>
     </div>
 
@@ -285,34 +238,45 @@ if(window.Telegram && window.Telegram.WebApp) {
     window.Telegram.WebApp.expand();
 }
 
-// --- INTRO LOGIC ---
-const introSeenKey = 'cat_rpg_intro_seen_v3'; // Изменил ключ, чтобы интро показалось снова
-const hasSeenIntro = localStorage.getItem(introSeenKey);
-if(!hasSeenIntro) {
-    document.getElementById('intro-screen').style.display = 'flex';
+// --- VIDEO INTRO LOGIC ---
+const videoSeenKey = 'cat_rpg_video_final_v6'; 
+const hasSeenVideo = localStorage.getItem(videoSeenKey);
+const introContainer = document.getElementById('intro-container');
+const videoElement = document.getElementById('intro-video');
+const startBtnOverlay = document.getElementById('start-btn-overlay');
+const skipBtnActive = document.getElementById('skip-btn-active');
+
+videoElement.onerror = function() {
+    alert("Ошибка: Файл 'intro.mp4' не найден рядом с index.html или не поддерживается!");
+    skipVideo();
+};
+
+if (!hasSeenVideo) {
+    introContainer.style.display = 'flex';
 } else {
     document.getElementById('class-screen').style.display = 'flex';
 }
 
-let currentSlide = 0;
-const slides = document.querySelectorAll('.slide');
-function nextSlide() {
-    slides[currentSlide].classList.remove('active');
-    currentSlide++;
-    if(currentSlide >= slides.length) startGameFlow();
-    else slides[currentSlide].classList.add('active');
-}
-function startGameFlow() {
-    localStorage.setItem(introSeenKey, 'true');
-    document.getElementById('intro-screen').style.display = 'none';
-    document.getElementById('class-screen').style.display = 'flex';
+function playVideo() {
+    startBtnOverlay.style.display = 'none';
+    skipBtnActive.style.display = 'block';
+    videoElement.play().catch(e => { console.log("Autoplay blocked"); videoElement.muted=false; videoElement.play(); });
 }
 
-// --- CONFIG ---
+function skipVideo() {
+    videoElement.pause();
+    introContainer.style.display = 'none';
+    localStorage.setItem(videoSeenKey, 'true');
+    document.getElementById('class-screen').style.display = 'flex';
+}
+videoElement.onended = function() { skipVideo(); };
+
+// --- CONFIG & ENGINE ---
 const CONFIG = {
     worldSize: 50000, 
     colors: { grass: '#2d9e6d', grassDark: '#268b5e' },
-    mobileZoomMod: 1.5 // Коэффициент отдаления камеры на мобильных
+    // ИСПРАВЛЕНО: Увеличен зум для мобилок, чтобы отдалить камеру
+    mobileZoomMod: 1.6 
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -321,32 +285,24 @@ const miniCanvas = document.getElementById('minimap');
 const miniCtx = miniCanvas.getContext('2d');
 let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.Telegram && window.Telegram.WebApp.initData);
 
-// --- УЛУЧШЕННАЯ ФУНКЦИЯ RESIZE (ДЛЯ ЗУМА) ---
 function resize() {
-    // Получаем реальные размеры окна
-    let displayWidth = window.innerWidth;
-    let displayHeight = window.innerHeight;
-
-    // Если это мобильный, мы обманываем канвас, говоря ему, что он больше,
-    // чем экран на самом деле. Это создает эффект "отдаления" камеры.
+    let dw = window.innerWidth;
+    let dh = window.innerHeight;
+    
+    // ЛОГИКА ОТДАЛЕНИЯ КАМЕРЫ (ЗУМ)
     if (isMobile) {
-        canvas.width = displayWidth * CONFIG.mobileZoomMod;
-        canvas.height = displayHeight * CONFIG.mobileZoomMod;
+        canvas.width = dw * CONFIG.mobileZoomMod;
+        canvas.height = dh * CONFIG.mobileZoomMod;
         document.getElementById('joystick-area').style.display = 'block';
     } else {
-        canvas.width = displayWidth;
-        canvas.height = displayHeight;
+        canvas.width = dw;
+        canvas.height = dh;
     }
-
-    // Миникарта всегда фиксированного размера
     miniCanvas.width = 200; miniCanvas.height = 200;
 }
 window.addEventListener('resize', resize);
-// Вызываем resize не сразу, а через небольшой таймаут, чтобы браузер успел убрать адресную строку на мобилках
 setTimeout(resize, 100);
 
-
-// --- INPUT & JOYSTICK ---
 const input = { keys: {}, joystick: { x: 0, y: 0, active: false } };
 window.addEventListener('keydown', e => input.keys[e.code] = true);
 window.addEventListener('keyup', e => input.keys[e.code] = false);
@@ -357,12 +313,11 @@ let joyTouchId = null;
 
 joyBase.addEventListener('touchstart', e => { e.preventDefault(); joyTouchId = e.changedTouches[0].identifier; input.joystick.active = true; }, {passive:false});
 joyBase.addEventListener('touchmove', e => {
-    e.preventDefault();
-    const touch = Array.from(e.changedTouches).find(t => t.identifier === joyTouchId);
+    e.preventDefault(); const touch = Array.from(e.changedTouches).find(t => t.identifier === joyTouchId);
     if(!touch) return;
-    const rect = joyBase.getBoundingClientRect();
-    const maxDist = rect.width/2 - 25;
-    // Корректируем координаты касания с учетом возможного масштабирования UI
+    const rect = joyBase.getBoundingClientRect(); const maxDist = rect.width/2 - 25;
+    
+    // Коррекция тача с учетом масштаба UI
     const uiScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
     let dx = (touch.clientX - (rect.left + rect.width/2)) / uiScale;
     let dy = (touch.clientY - (rect.top + rect.height/2)) / uiScale;
@@ -375,22 +330,16 @@ joyBase.addEventListener('touchmove', e => {
 const endJoy = (e) => { e.preventDefault(); joyTouchId = null; input.joystick.active = false; input.joystick.x=0; input.joystick.y=0; joyStick.style.transform = `translate(-50%, -50%)`; };
 joyBase.addEventListener('touchend', endJoy); joyBase.addEventListener('touchcancel', endJoy);
 
-// --- UTILS ---
 function drawCircle(ctx, x, y, r, color, stroke=null) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fillStyle=color; ctx.fill();
     if(stroke) { ctx.strokeStyle=stroke; ctx.lineWidth=2; ctx.stroke(); }
 }
 
-// --- GAME CLASSES ---
-
 class Camera {
     constructor() { this.x = 0; this.y = 0; }
     follow(t) {
-        // Плавно следуем за игроком, центрируя его на канвасе
-        this.x += (t.x - canvas.width/2 - this.x) * 0.1;
-        this.y += (t.y - canvas.height/2 - this.y) * 0.1;
-        this.x = Math.max(0, Math.min(this.x, CONFIG.worldSize - canvas.width));
-        this.y = Math.max(0, Math.min(this.y, CONFIG.worldSize - canvas.height));
+        this.x += (t.x - canvas.width/2 - this.x) * 0.1; this.y += (t.y - canvas.height/2 - this.y) * 0.1;
+        this.x = Math.max(0, Math.min(this.x, CONFIG.worldSize - canvas.width)); this.y = Math.max(0, Math.min(this.y, CONFIG.worldSize - canvas.height));
     }
 }
 
@@ -399,177 +348,132 @@ class Entity {
     isVisible(cx, cy) { return this.x+this.r+50 > cx && this.x-this.r-50 < cx+canvas.width && this.y+this.r+50 > cy && this.y-this.r-50 < cy+canvas.height; }
     resolveObstacle(o) {
         const dx = this.x - o.x; const dy = this.y - o.y; const dist = Math.hypot(dx, dy); const minDist = this.r + o.r;
-        if (dist < minDist) {
-            const angle = Math.atan2(dy, dx);
-            const push = minDist - dist;
-            this.x += Math.cos(angle) * push; this.y += Math.sin(angle) * push;
+        if (dist < minDist) { const angle = Math.atan2(dy, dx); const push = minDist - dist; this.x += Math.cos(angle) * push; this.y += Math.sin(angle) * push; }
+    }
+}
+
+class XPOrb extends Entity {
+    constructor(x, y, val) { super(x, y, 4); this.val = val; this.magnetized = false; }
+    update() {
+        const dist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+        if (this.magnetized || dist < game.player.magnetRange) {
+            const ang = Math.atan2(game.player.y - this.y, game.player.x - this.x); const speed = this.magnetized ? 15 : 8;
+            this.x += Math.cos(ang) * speed; this.y += Math.sin(ang) * speed;
+            if (Math.hypot(game.player.x - this.x, game.player.y - this.y) < 20) { this.dead = true; game.addXP(this.val); }
         }
     }
+    draw(ctx) { ctx.fillStyle='#2ed573'; ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.fill(); }
 }
 
 class Obstacle extends Entity {
     constructor(x, y, type) { super(x, y, type==='tree'?35:30); this.type = type; }
     draw(ctx) {
-        ctx.fillStyle = 'rgba(0,0,0,0.3)'; drawCircle(ctx, this.x+5, this.y+5, this.r, null); 
-        if(this.type === 'tree') {
-            drawCircle(ctx, this.x, this.y, 15, '#5d4037');
-            drawCircle(ctx, this.x, this.y-25, 45, '#1e8449', '#145a32');
-            drawCircle(ctx, this.x-15, this.y-40, 15, '#2ecc71');
-        } else {
-            ctx.fillStyle = '#7f8c8d'; ctx.strokeStyle = '#535c68'; ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.roundRect(this.x-30, this.y-25, 60, 50, 10); ctx.fill(); ctx.stroke();
-            drawCircle(ctx, this.x-10, this.y-10, 5, '#95a5a6');
-        }
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; drawCircle(ctx, this.x+5, this.y+5, this.r, null);
+        if(this.type === 'tree') { drawCircle(ctx, this.x, this.y, 15, '#5d4037'); drawCircle(ctx, this.x, this.y-25, 45, '#1e8449', '#145a32'); drawCircle(ctx, this.x-15, this.y-40, 15, '#2ecc71'); }
+        else { ctx.fillStyle = '#7f8c8d'; ctx.strokeStyle = '#535c68'; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(this.x-30, this.y-25, 60, 50, 10); ctx.fill(); ctx.stroke(); drawCircle(ctx, this.x-10, this.y-10, 5, '#95a5a6'); }
+    }
+}
+
+class BuffAltar extends Entity {
+    constructor(type) {
+        super(Math.random()*(CONFIG.worldSize-500)+250, Math.random()*(CONFIG.worldSize-500)+250, 80);
+        this.type = type; this.active = true; this.progress = 0; this.maxProgress = 300;
+        if(type==='vamp') { this.color = '#e74c3c'; } if(type==='chrono') { this.color = '#0984e3'; } if(type==='titan') { this.color = '#2ecc71'; }
+    }
+    update() {
+        if(!this.active) return;
+        const dist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+        if(dist < this.r) { this.progress += 1; if(this.progress >= this.maxProgress) { this.activateBuff(); this.active = false; } }
+        else { this.progress = Math.max(0, this.progress - 0.5); }
+    }
+    activateBuff() {
+        const msg = document.getElementById('pickup-msg'); msg.style.opacity = 1; setTimeout(()=>msg.style.opacity=0, 3000);
+        if(this.type === 'vamp') { game.player.vampirism = true; msg.innerText = "ДАР ВАМПИРА!"; }
+        if(this.type === 'chrono') { game.player.weapons.forEach(w => w.stats.maxCd *= 0.8); game.player.cooldownReduction = 0.8; msg.innerText = "ВРЕМЯ УСКОРЕНО!"; }
+        if(this.type === 'titan') { game.player.sizeMult = 1.3; msg.innerText = "СИЛА ТИТАНА!"; }
+        game.createExplosion(this.x, this.y, 200, 0, this.color);
+    }
+    draw(ctx) {
+        if(!this.active) return;
+        ctx.strokeStyle = this.color; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.stroke();
+        ctx.globalAlpha = 0.3; ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.r * (this.progress/this.maxProgress), 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1.0;
+        ctx.fillStyle = '#fff'; ctx.font = '30px serif'; ctx.fillText('⚡', this.x-10, this.y+10);
     }
 }
 
 class SuperAltar extends Entity {
-    constructor() {
-        super(Math.random()*(CONFIG.worldSize-1000)+500, Math.random()*(CONFIG.worldSize-1000)+500, 200);
-        this.active = true;
-    }
+    constructor() { super(Math.random()*(CONFIG.worldSize-1000)+500, Math.random()*(CONFIG.worldSize-1000)+500, 200); this.active = true; }
     update() {
         if(!this.active) return;
         const d = Math.hypot(game.player.x - this.x, game.player.y - this.y);
-        
-        // Hide warning if far away
-        if (d > this.r + 200) {
-             document.getElementById('altar-warning').style.display = 'none';
-        } else if (d < this.r + 50 && game.time < 600) {
-             const w = document.getElementById('altar-warning');
-             w.style.display = 'block';
-             w.innerText = `ПЕЧАТЬ: ${Math.ceil(600 - game.time)} сек`;
-        } 
-
-        if (d < this.r && game.time >= 600) {
-            this.active = false;
-            game.spawnSuperBoss(this.x, this.y);
-            document.getElementById('altar-warning').style.display = 'none';
-        }
+        if (d > this.r + 200) { document.getElementById('altar-warning').style.display = 'none'; }
+        else if (d < this.r + 50 && game.time < 600) { const w = document.getElementById('altar-warning'); w.style.display = 'block'; w.innerText = `ПЕЧАТЬ: ${Math.ceil(600 - game.time)} сек`; }
+        if (d < this.r && game.time >= 600) { this.active = false; game.spawnSuperBoss(this.x, this.y); document.getElementById('altar-warning').style.display = 'none'; }
     }
     draw(ctx) {
         if(!this.active) return;
-        ctx.fillStyle = 'rgba(75, 0, 130, 0.3)';
-        ctx.beginPath(); ctx.arc(this.x, this.y, 400, 0, Math.PI*2); ctx.fill();
-        
-        ctx.strokeStyle = game.time >= 600 ? '#f0f' : '#555';
-        ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.stroke();
-        
+        ctx.fillStyle = 'rgba(75, 0, 130, 0.3)'; ctx.beginPath(); ctx.arc(this.x, this.y, 400, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = game.time >= 600 ? '#f0f' : '#555'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.stroke();
         ctx.font = '30px serif'; ctx.fillStyle='#fff'; ctx.fillText('☠️', this.x-15, this.y+10);
     }
 }
 
 class Merchant extends Entity {
     constructor() { super(Math.random()*(CONFIG.worldSize-500)+250, Math.random()*(CONFIG.worldSize-500)+250, 40); }
-    update() {
-        if(Math.hypot(game.player.x - this.x, game.player.y - this.y) < this.r + 30) {
-            game.openShop(this);
-        }
-    }
+    update() { if(Math.hypot(game.player.x - this.x, game.player.y - this.y) < this.r + 30) { game.openShop(this); } }
     draw(ctx) {
-        drawCircle(ctx, this.x, this.y, 30, '#95a5a6', '#2c3e50'); 
-        drawCircle(ctx, this.x, this.y-5, 20, '#fff'); 
-        drawCircle(ctx, this.x-8, this.y-5, 3, '#000'); 
-        drawCircle(ctx, this.x+8, this.y-5, 3, '#000'); 
-        ctx.fillStyle='#f1c40f'; ctx.font='20px sans-serif'; ctx.fillText('🛒', this.x-12, this.y-35);
+        // ИСПРАВЛЕНО: Енот теперь серый (#95a5a6)
+        drawCircle(ctx, this.x, this.y, 30, '#95a5a6', '#2c3e50'); drawCircle(ctx, this.x, this.y-5, 20, '#fff'); 
+        drawCircle(ctx, this.x-8, this.y-5, 3, '#000'); drawCircle(ctx, this.x+8, this.y-5, 3, '#000'); ctx.fillStyle='#f1c40f'; ctx.font='20px sans-serif'; ctx.fillText('🛒', this.x-12, this.y-35);
     }
 }
 
 class Enemy extends Entity {
     constructor(isBoss=false, isSuperBoss=false, x, y) {
         if(!x) {
-            const angle = Math.random()*Math.PI*2;
-            const dist = 900;
-            x = Math.max(100, Math.min(CONFIG.worldSize-100, game.player.x + Math.cos(angle)*dist));
-            y = Math.max(100, Math.min(CONFIG.worldSize-100, game.player.y + Math.sin(angle)*dist));
+            const angle = Math.random()*Math.PI*2; const dist = 900;
+            x = Math.max(100, Math.min(CONFIG.worldSize-100, game.player.x + Math.cos(angle)*dist)); y = Math.max(100, Math.min(CONFIG.worldSize-100, game.player.y + Math.sin(angle)*dist));
         }
-        
-        super(x, y, isBoss?60:20);
-        this.isBoss = isBoss;
-        this.isSuperBoss = isSuperBoss;
+        super(x, y, isBoss?60:20); this.isBoss = isBoss; this.isSuperBoss = isSuperBoss;
         
         if(isSuperBoss) {
-            this.r = 100;
-            this.type = 'lich'; this.maxHp = 50000; this.hp = this.maxHp;
-            this.xp = 10000; this.dmg = 200; this.speed = 3.0; this.armor = 50;
+            this.r = 100; this.type = 'lich'; this.maxHp = 50000; this.hp = this.maxHp; this.xp = 10000; this.dmg = 200; this.speed = 2.4; this.armor = 50;
         } else {
-            const mins = game.time / 60;
-            const hpMult = 1 + (mins * 0.4);
-            const dmgMult = 1 + (mins * 0.2);
-            this.armor = Math.floor(mins * 2);
-            
-            if(isBoss) {
-                this.type = 'demon'; this.maxHp = 5000 * hpMult; this.hp = this.maxHp; 
-                this.xp = 1000; this.dmg = 40 * dmgMult; this.speed = 2.4; this.armor += 10;
-            } else {
+            const mins = game.time / 60; const hpMult = 1 + (mins * 1.5); const dmgMult = 1 + (mins * 0.5); this.armor = Math.floor(mins * 3);
+            let earlyGameBuff = 1.0; if (game.time < 60) earlyGameBuff = 2.5; 
+            if(isBoss) { this.type = 'demon'; this.maxHp = 3000 * hpMult; this.hp = this.maxHp; this.xp = 1000; this.dmg = 40 * dmgMult; this.speed = 1.9; this.armor += 10; }
+            else {
                 const r = Math.random();
-                if(r < 0.3) { this.type='slime'; this.maxHp=30*hpMult; this.speed=1.6; this.dmg=8*dmgMult; this.xp=5; }
-                else if(r < 0.6) { this.type='bat'; this.maxHp=20*hpMult; this.speed=2.7; this.dmg=5*dmgMult; this.xp=5; }
-                else if(r < 0.8) { this.type='ghost'; this.maxHp=50*hpMult; this.speed=1.3; this.dmg=15*dmgMult; this.xp=10; this.armor+=5;}
-                else { this.type='spider'; this.maxHp=80*hpMult; this.speed=1.2; this.dmg=12*dmgMult; this.xp=15; this.armor+=2;}
+                if(r < 0.3) { this.type='slime'; this.maxHp=30*hpMult*earlyGameBuff; this.speed=1.3; this.dmg=8*dmgMult; this.xp=5; }
+                else if(r < 0.6) { this.type='bat'; this.maxHp=20*hpMult*earlyGameBuff; this.speed=2.1; this.dmg=5*dmgMult; this.xp=5; }
+                else if(r < 0.8) { this.type='ghost'; this.maxHp=50*hpMult*earlyGameBuff; this.speed=1.0; this.dmg=15*dmgMult; this.xp=10; this.armor+=5;}
+                else { this.type='spider'; this.maxHp=80*hpMult*earlyGameBuff; this.speed=1.0; this.dmg=12*dmgMult; this.xp=15; this.armor+=2;}
                 this.hp = this.maxHp;
             }
         }
     }
-
     update() {
         const ang = Math.atan2(game.player.y-this.y, game.player.x-this.x);
-        this.x += Math.cos(ang)*this.speed;
-        this.y += Math.sin(ang)*this.speed;
-
+        this.x += Math.cos(ang)*this.speed; this.y += Math.sin(ang)*this.speed;
         if(this.isBoss || this.isSuperBoss) {
-            game.obstacles.forEach((o, index) => {
-                if(o && Math.hypot(this.x-o.x, this.y-o.y) < this.r + o.r) {
-                    game.particles.push(new Particle(o.x, o.y, '#7f8c8d'));
-                    delete game.obstacles[index]; 
-                }
-            });
-        } else {
-            game.obstacles.forEach(o => {
-                if(o && this.isVisible(game.camera.x, game.camera.y)) this.resolveObstacle(o);
-            });
-        }
+            game.obstacles.forEach((o, index) => { if(o && Math.hypot(this.x-o.x, this.y-o.y) < this.r + o.r) { game.particles.push(new Particle(o.x, o.y, '#7f8c8d')); delete game.obstacles[index]; } });
+        } else { game.obstacles.forEach(o => { if(o && this.isVisible(game.camera.x, game.camera.y)) this.resolveObstacle(o); }); }
     }
-
     draw(ctx) {
         ctx.save(); ctx.translate(this.x, this.y);
-        
-        if(this.isBoss || this.isSuperBoss) {
-            ctx.fillStyle='red'; ctx.fillRect(-50, -this.r-20, 100, 10);
-            ctx.fillStyle='#0f0'; ctx.fillRect(-50, -this.r-20, 100 * (Math.max(0,this.hp)/this.maxHp), 10);
-        }
-
+        if(this.isBoss || this.isSuperBoss) { ctx.fillStyle='red'; ctx.fillRect(-50, -this.r-20, 100, 10); ctx.fillStyle='#0f0'; ctx.fillRect(-50, -this.r-20, 100 * (Math.max(0,this.hp)/this.maxHp), 10); }
         if(this.isSuperBoss) {
-             drawCircle(ctx, 0, 0, 80, '#2c0e3a', '#e056fd');
-             ctx.fillStyle='#fff'; 
-             ctx.beginPath(); ctx.arc(-20, -10, 10, 0, Math.PI*2); ctx.fill();
-             ctx.beginPath(); ctx.arc(20, -10, 10, 0, Math.PI*2); ctx.fill();
-             ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(-20, -10, 3, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(20, -10, 3, 0, Math.PI*2); ctx.fill();
+             drawCircle(ctx, 0, 0, 80, '#2c0e3a', '#e056fd'); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-20, -10, 10, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(20, -10, 10, 0, Math.PI*2); ctx.fill(); ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(-20, -10, 3, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(20, -10, 3, 0, Math.PI*2); ctx.fill();
         } else if(this.type === 'slime') {
-            ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(0,0,20,Math.PI, 0); ctx.fill();
-            ctx.fillRect(-20,0,40,10); 
-            ctx.fillStyle = '#000'; drawCircle(ctx, -5, -5, 3, '#000'); drawCircle(ctx, 5, -5, 3, '#000');
+            ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(0,0,20,Math.PI, 0); ctx.fill(); ctx.fillRect(-20,0,40,10); ctx.fillStyle = '#000'; drawCircle(ctx, -5, -5, 3, '#000'); drawCircle(ctx, 5, -5, 3, '#000');
         } else if (this.type === 'bat') {
-            ctx.fillStyle = '#8e44ad'; 
-            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-20,-15); ctx.lineTo(-10,5); ctx.fill();
-            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(20,-15); ctx.lineTo(10,5); ctx.fill();
-            drawCircle(ctx, 0, 0, 10, '#34495e');
+            ctx.fillStyle = '#8e44ad'; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-20,-15); ctx.lineTo(-10,5); ctx.fill(); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(20,-15); ctx.lineTo(10,5); ctx.fill(); drawCircle(ctx, 0, 0, 10, '#34495e');
         } else if (this.type === 'ghost') {
-            ctx.fillStyle = 'rgba(236, 240, 241, 0.8)';
-            ctx.beginPath(); ctx.arc(0,-10,15,Math.PI,0); ctx.lineTo(15,20); ctx.lineTo(0,10); ctx.lineTo(-15,20); ctx.fill();
-            ctx.fillStyle = '#000'; drawCircle(ctx, -6, -10, 2, '#000'); drawCircle(ctx, 6, -10, 2, '#000');
+            ctx.fillStyle = 'rgba(236, 240, 241, 0.8)'; ctx.beginPath(); ctx.arc(0,-10,15,Math.PI,0); ctx.lineTo(15,20); ctx.lineTo(0,10); ctx.lineTo(-15,20); ctx.fill(); ctx.fillStyle = '#000'; drawCircle(ctx, -6, -10, 2, '#000'); drawCircle(ctx, 6, -10, 2, '#000');
         } else if (this.type === 'spider') {
-            ctx.strokeStyle = '#2c3e50'; ctx.lineWidth=2;
-            for(let i=0; i<4; i++) { ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(i)*25, Math.sin(i)*25); ctx.stroke(); }
-            drawCircle(ctx, 0, 0, 12, '#2c3e50'); ctx.fillStyle='red'; drawCircle(ctx, 0, -5, 2, 'red');
+            ctx.strokeStyle = '#2c3e50'; ctx.lineWidth=2; for(let i=0; i<4; i++) { ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(i)*25, Math.sin(i)*25); ctx.stroke(); } drawCircle(ctx, 0, 0, 12, '#2c3e50'); ctx.fillStyle='red'; drawCircle(ctx, 0, -5, 2, 'red');
         } else if (this.type === 'demon') {
-            drawCircle(ctx, 0, 0, 50, '#c0392b', '#000');
-            ctx.fillStyle = '#f1c40f';
-            ctx.beginPath(); ctx.moveTo(-20,-30); ctx.lineTo(-40,-60); ctx.lineTo(-10,-40); ctx.fill();
-            ctx.beginPath(); ctx.moveTo(20,-30); ctx.lineTo(40,-60); ctx.lineTo(10,-40); ctx.fill();
-            ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.moveTo(-30,-10); ctx.lineTo(-10,-10); ctx.lineTo(-20, 10); ctx.fill();
-            ctx.beginPath(); ctx.moveTo(30,-10); ctx.lineTo(10,-10); ctx.lineTo(20, 10); ctx.fill();
+            drawCircle(ctx, 0, 0, 50, '#c0392b', '#000'); ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.moveTo(-20,-30); ctx.lineTo(-40,-60); ctx.lineTo(-10,-40); ctx.fill(); ctx.beginPath(); ctx.moveTo(20,-30); ctx.lineTo(40,-60); ctx.lineTo(10,-40); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-30,-10); ctx.lineTo(-10,-10); ctx.lineTo(-20, 10); ctx.fill(); ctx.beginPath(); ctx.moveTo(30,-10); ctx.lineTo(10,-10); ctx.lineTo(20, 10); ctx.fill();
         }
         ctx.restore();
     }
@@ -578,27 +482,20 @@ class Enemy extends Entity {
 class Player extends Entity {
     constructor(type) {
         super(CONFIG.worldSize/2, CONFIG.worldSize/2, 20);
-        this.type = type;
-        this.hp = 100; this.maxHp = 100;
-        this.xp = 0; this.xpNext = 20; this.lvl = 1; this.speed = 4;
-        this.weapons = []; this.facing = 1; 
-        
-        this.globalCount = 0;
-        this.armorPen = 0; 
-        this.areaMod = 1.0;
-        this.armor = 0;
-        this.regen = 0;
-        this.magnetRange = 150;
+        this.type = type; this.hp = 100; this.maxHp = 100; this.xp = 0; this.xpNext = 20; this.lvl = 1; this.speed = 4;
+        this.weapons = []; this.facing = 1; this.globalCount = 0; this.armorPen = 0; this.areaMod = 1.0; this.armor = 0; this.regen = 0; this.magnetRange = 150;
+        this.vampirism = false; this.cooldownReduction = 1.0; this.sizeMult = 1.0;
 
         if(type==='mainecoon') { this.maxHp=200; this.hp=200; this.speed=2.9; this.addWeapon('paw'); }
-        if(type==='sphynx') { this.maxHp=80; this.hp=80; this.speed=5.1; this.addWeapon('laser'); }
         if(type==='tabby') { this.speed=3.4; this.addWeapon('yarn'); }
         if(type==='black') { this.critChance = 0.2; this.speed=3.4; this.addWeapon('shadow_claws'); }
         if(type==='siamese') { this.areaMod = 1.2; this.speed=3.4; this.addWeapon('garlic'); }
         if(type==='ragdoll') { this.armor = 5; this.maxHp=150; this.hp=150; this.speed=2.5; this.addWeapon('bomb_weapon'); }
         if(type==='persian') { this.regen = 1; this.speed=2.1; this.addWeapon('fish'); }
+        if(type==='siberian') { this.maxHp=120; this.hp=120; this.speed=3.8; this.addWeapon('blizzard'); }
+        if(type==='british') { this.maxHp=140; this.hp=140; this.speed=3.0; this.armor=2; this.addWeapon('tea'); }
+        if(type==='munchkin') { this.r=15; this.maxHp=90; this.hp=90; this.speed=4.5; this.addWeapon('dagger'); }
     }
-
     addWeapon(id, isMega=false) {
         const existing = this.weapons.find(w => w.id === id);
         if(!existing && this.weapons.length >= 4) return false;
@@ -606,47 +503,29 @@ class Player extends Entity {
         else { const w = new Weapon(id, this); if(isMega) w.megaUpgrade(); this.weapons.push(w); this.updateWeaponUI(); }
         return true;
     }
-    
     updateWeaponUI() {
-        const list = document.getElementById('weapons-list');
-        list.innerHTML = '';
-        this.weapons.forEach(w => {
-            const el = document.createElement('div');
-            el.innerHTML = w.icon || '❓';
-            el.style.cssText = 'width:25px;height:25px;background:#333;border-radius:50%;text-align:center;font-size:16px;line-height:25px;border:1px solid #fff;';
-            list.appendChild(el);
-        });
+        const list = document.getElementById('weapons-list'); list.innerHTML = '';
+        this.weapons.forEach(w => { const el = document.createElement('div'); el.innerHTML = w.icon || '❓'; el.style.cssText = 'width:25px;height:25px;background:#333;border-radius:50%;text-align:center;font-size:16px;line-height:25px;border:1px solid #fff;'; list.appendChild(el); });
     }
-
     update() {
         if(this.regen > 0 && Math.random() < 0.01) this.hp = Math.min(this.maxHp, this.hp + this.regen);
         let dx=0, dy=0;
         if(input.joystick.active) { dx=input.joystick.x; dy=input.joystick.y; }
-        else {
-            if(input.keys['KeyW'] || input.keys['ArrowUp']) dy=-1;
-            if(input.keys['KeyS'] || input.keys['ArrowDown']) dy=1;
-            if(input.keys['KeyA'] || input.keys['ArrowLeft']) dx=-1;
-            if(input.keys['KeyD'] || input.keys['ArrowRight']) dx=1;
-        }
+        else { if(input.keys['KeyW'] || input.keys['ArrowUp']) dy=-1; if(input.keys['KeyS'] || input.keys['ArrowDown']) dy=1; if(input.keys['KeyA'] || input.keys['ArrowLeft']) dx=-1; if(input.keys['KeyD'] || input.keys['ArrowRight']) dx=1; }
         if(!input.joystick.active && (dx||dy)) { const l=Math.hypot(dx,dy); dx/=l; dy/=l; }
         this.x += dx*this.speed; this.y += dy*this.speed;
         game.obstacles.forEach(o => { if(o) this.resolveObstacle(o); });
-        this.x = Math.max(50, Math.min(CONFIG.worldSize-50, this.x));
-        this.y = Math.max(50, Math.min(CONFIG.worldSize-50, this.y));
+        this.x = Math.max(50, Math.min(CONFIG.worldSize-50, this.x)); this.y = Math.max(50, Math.min(CONFIG.worldSize-50, this.y));
         if(dx>0) this.facing=1; if(dx<0) this.facing=-1;
         this.weapons.forEach(w => w.update());
     }
-    
     draw(ctx) {
         this.weapons.forEach(w => w.draw(ctx));
         ctx.save(); ctx.translate(this.x, this.y); ctx.scale(this.facing, 1);
         let color = '#fff';
-        if(this.type==='mainecoon') color='#5d4037';
-        if(this.type==='black') color='#2d3436';
-        if(this.type==='siamese') color='#f5f6fa';
-        if(this.type==='persian') color='#ecf0f1';
-        drawCircle(ctx, 0, 5, 20, color, '#000'); 
-        drawCircle(ctx, 0, -10, 16, color, '#000'); 
+        if(this.type==='mainecoon') color='#5d4037'; if(this.type==='black') color='#2d3436'; if(this.type==='siamese') color='#f5f6fa'; if(this.type==='persian') color='#ecf0f1'; if(this.type==='siberian') color='#dfe6e9'; if(this.type==='british') color='#636e72'; if(this.type==='munchkin') color='#e17055';
+        ctx.scale(this.sizeMult, this.sizeMult);
+        drawCircle(ctx, 0, 5, 20, color, '#000'); drawCircle(ctx, 0, -10, 16, color, '#000'); 
         ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(-10,-20); ctx.lineTo(-15,-35); ctx.lineTo(-5,-25); ctx.fill(); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(10,-20); ctx.lineTo(15,-35); ctx.lineTo(5,-25); ctx.fill(); ctx.stroke();
         ctx.fillStyle='#fff'; drawCircle(ctx, 5, -10, 4, '#fff'); drawCircle(ctx, -5, -10, 4, '#fff');
@@ -659,16 +538,17 @@ class Weapon {
     constructor(id, owner) {
         this.id = id; this.owner = owner; this.level = 1; this.cd = 0;
         this.stats = { dmg: 10, speed: 1, size: 1, maxCd: 60, count: 1, area: 100, duration: 60 };
-        this.setup();
+        this.setup(); this.stats.maxCd *= owner.cooldownReduction;
     }
     setup() {
         if(this.id==='paw') { this.name="Лапа"; this.icon="🐾"; this.stats={dmg:25, maxCd:40, speed:8, count:1, range:300}; }
         if(this.id==='yarn') { this.name="Клубок"; this.icon="🧶"; this.stats={dmg:12, maxCd:0, speed:0.04, count:1, dist:80, size:10}; }
-        if(this.id==='laser') { this.name="Лазер"; this.icon="🔴"; this.stats={dmg:5, maxCd:5, range:400}; }
+        if(this.id==='blizzard') { this.name="Вьюга"; this.icon="❄️"; this.stats={dmg:8, maxCd:10, count:1, speed:1.5}; }
+        if(this.id==='tea') { this.name="Чай"; this.icon="☕"; this.stats={dmg:15, maxCd:90, speed:5, area: 80, duration: 200}; }
+        if(this.id==='dagger') { this.name="Кортик"; this.icon="🗡️"; this.stats={dmg:20, maxCd:25, range:70, count:1}; }
         if(this.id==='fish') { this.name="Кость"; this.icon="🐟"; this.stats={dmg:40, maxCd:70, speed:6, count:1}; }
         if(this.id==='shadow_claws') { this.name="Тень"; this.icon="🌑"; this.stats={dmg:60, maxCd:50, range:100, area: 80}; }
         if(this.id==='bomb_weapon') { this.name="Мята"; this.icon="💣"; this.stats={dmg:100, maxCd:150, area:150}; }
-        if(this.id==='water') { this.name="Брызги"; this.icon="💦"; this.stats={dmg:10, maxCd:60, count:3, speed:4}; }
         if(this.id==='garlic') { this.name="Аура"; this.icon="✨"; this.stats={dmg:3, maxCd:15, area:90}; }
     }
     upgrade(stat1, stat2) {
@@ -688,108 +568,108 @@ class Weapon {
     update() {
         if(this.cd > 0) this.cd--;
         const totalCount = this.stats.count + this.owner.globalCount;
-        const areaMult = this.owner.areaMod;
+        const areaMult = this.owner.areaMod * this.owner.sizeMult;
         const owner = this.owner;
 
         if(this.id === 'paw' && this.cd <= 0) {
             const t = game.getNearestEnemy(owner, this.stats.range);
-            if(t) {
-                for(let i=0; i<totalCount; i++) game.projectiles.push(new Projectile(owner.x, owner.y, t, 'paw', this.stats, (i-(totalCount-1)/2)*0.2));
-                this.cd = this.stats.maxCd;
-            }
+            if(t) { for(let i=0; i<totalCount; i++) game.projectiles.push(new Projectile(owner.x, owner.y, t, 'paw', this.stats, (i-(totalCount-1)/2)*0.2)); this.cd = this.stats.maxCd; }
         }
-        if(this.id === 'laser' && this.cd <= 0) {
+        if(this.id === 'blizzard' && this.cd <= 0) {
+             const angle = (Date.now() / 500) % (Math.PI*2);
+             for(let i=0; i<totalCount; i++) {
+                 const a = angle + (i * (Math.PI*2/totalCount));
+                 const p = new Projectile(owner.x, owner.y, {x: owner.x+Math.cos(a)*100, y: owner.y+Math.sin(a)*100}, 'shard', this.stats, 0);
+                 game.projectiles.push(p);
+             }
+             this.cd = this.stats.maxCd;
+        }
+        if(this.id === 'tea' && this.cd <= 0) {
             const t = game.getNearestEnemy(owner, 400);
-            if(t) {
-                game.projectiles.push(new Projectile(owner.x, owner.y, t, 'laser', this.stats, 0));
-                this.cd = this.stats.maxCd;
-            }
+            if(t) { game.projectiles.push(new Projectile(owner.x, owner.y, t, 'tea_cup', this.stats, 0)); this.cd = this.stats.maxCd; }
+        }
+        if(this.id === 'dagger' && this.cd <= 0) {
+             const t = game.getNearestEnemy(owner, 150);
+             let angle = owner.facing === 1 ? 0 : Math.PI;
+             if (t) { angle = Math.atan2(t.y - owner.y, t.x - owner.x); }
+             for(let i=0; i<totalCount; i++) { setTimeout(() => { game.projectiles.push(new Projectile(owner.x, owner.y, null, 'dagger_slash', this.stats, angle)); }, i * 100); }
+             this.cd = this.stats.maxCd;
         }
         if(this.id === 'fish' && this.cd <= 0) {
-             const t = game.getNearestEnemy(owner, 500);
-             if(t) { game.projectiles.push(new Projectile(owner.x, owner.y, t, 'fish', this.stats, 0)); this.cd = this.stats.maxCd; }
+             const t = game.getNearestEnemy(owner, 500); if(t) { game.projectiles.push(new Projectile(owner.x, owner.y, t, 'fish', this.stats, 0)); this.cd = this.stats.maxCd; }
         }
         if(this.id === 'bomb_weapon' && this.cd <= 0) {
-            game.projectiles.push(new Projectile(owner.x, owner.y, null, 'bomb', { ...this.stats, area: this.stats.area*areaMult }));
-            this.cd = this.stats.maxCd;
+            game.projectiles.push(new Projectile(owner.x, owner.y, null, 'bomb', { ...this.stats, area: this.stats.area*areaMult })); this.cd = this.stats.maxCd;
         }
         if(this.id === 'shadow_claws' && this.cd <= 0) {
             const angle = owner.facing === 1 ? 0 : Math.PI;
-            game.createExplosion(owner.x + Math.cos(angle)*50, owner.y, this.stats.area*areaMult, this.stats.dmg, '#2d3436');
-            this.cd = this.stats.maxCd;
+            game.createExplosion(owner.x + Math.cos(angle)*50, owner.y, this.stats.area*areaMult, this.stats.dmg, '#2d3436'); this.cd = this.stats.maxCd;
         }
         if(this.id === 'garlic' && this.cd <= 0) {
-            game.enemies.forEach(e => { if(Math.hypot(e.x-owner.x, e.y-owner.y) < this.stats.area * areaMult) game.damageEnemy(e, this.stats.dmg); });
-            this.cd = this.stats.maxCd;
+            game.enemies.forEach(e => { if(Math.hypot(e.x-owner.x, e.y-owner.y) < this.stats.area * areaMult) game.damageEnemy(e, this.stats.dmg); }); this.cd = this.stats.maxCd;
         }
     }
     
     draw(ctx) {
         const totalCount = this.stats.count + this.owner.globalCount;
         if(this.id === 'yarn') {
-            const step = (Math.PI*2)/totalCount;
-            const now = Date.now()*0.001*this.stats.speed*10;
+            const step = (Math.PI*2)/totalCount; const now = Date.now()*0.001*this.stats.speed*10;
             for(let i=0; i<totalCount; i++) {
-                const ang = now + i*step;
-                const bx = this.owner.x + Math.cos(ang)*this.stats.dist;
-                const by = this.owner.y + Math.sin(ang)*this.stats.dist;
-                drawCircle(ctx, bx, by, this.stats.size, '#e74c3c');
-                ctx.strokeStyle='rgba(231,76,60,0.5)'; ctx.beginPath(); ctx.moveTo(this.owner.x, this.owner.y); ctx.lineTo(bx, by); ctx.stroke();
+                const ang = now + i*step; const bx = this.owner.x + Math.cos(ang)*this.stats.dist; const by = this.owner.y + Math.sin(ang)*this.stats.dist;
+                drawCircle(ctx, bx, by, this.stats.size, '#e74c3c'); ctx.strokeStyle='rgba(231,76,60,0.5)'; ctx.beginPath(); ctx.moveTo(this.owner.x, this.owner.y); ctx.lineTo(bx, by); ctx.stroke();
                 game.enemies.forEach(e => { if(Math.hypot(bx-e.x, by-e.y) < this.stats.size+e.r) game.damageEnemy(e, this.stats.dmg); });
             }
         }
         if(this.id === 'garlic') {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; ctx.beginPath(); ctx.arc(this.owner.x, this.owner.y, this.stats.area * this.owner.areaMod, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth=1; ctx.stroke();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; ctx.beginPath(); ctx.arc(this.owner.x, this.owner.y, this.stats.area * this.owner.areaMod * this.owner.sizeMult, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth=1; ctx.stroke();
         }
     }
 }
 
 class Projectile extends Entity {
-    constructor(x, y, target, type, stats, angOff=0) {
-        super(x, y, 10);
-        this.type = type; this.dmg = stats.dmg; this.speed = stats.speed; this.target = target;
-        this.timer = 120;
-        if(type==='bomb') { this.timer = 60; this.area = stats.area; } 
+    constructor(x, y, target, type, stats, extraData=0) {
+        super(x, y, 10); this.type = type; this.dmg = stats.dmg; this.speed = stats.speed; this.target = target; this.timer = 120; this.extra = extraData;
+        if(game.player.sizeMult > 1) this.r *= game.player.sizeMult;
+        if(type==='bomb') { this.timer = 60; this.area = stats.area * game.player.sizeMult; }
+        else if (type==='tea_puddle') { this.timer = stats.duration || 200; this.r = stats.area * game.player.sizeMult; }
+        else if (type==='dagger_slash') { this.timer = 10; this.angle = extraData; }
         else {
-            const ang = Math.atan2(target.y - y, target.x - x) + angOff;
-            this.vx = Math.cos(ang)*this.speed; this.vy = Math.sin(ang)*this.speed;
-            this.angle = ang;
+            const ang = Math.atan2(target.y - y, target.x - x) + extraData;
+            this.vx = Math.cos(ang)*this.speed; this.vy = Math.sin(ang)*this.speed; this.angle = ang;
             if(type==='fish') { this.returnState = 0; this.timer=200; }
         }
     }
     update() {
-        if(this.type === 'bomb') {
-            this.timer--;
-            if(this.timer <= 0) { this.dead = true; game.createExplosion(this.x, this.y, this.area, this.dmg, '#2ecc71'); }
-            return;
+        if(this.type === 'bomb') { this.timer--; if(this.timer <= 0) { this.dead = true; game.createExplosion(this.x, this.y, this.area, this.dmg, '#2ecc71'); } return; }
+        if(this.type === 'tea_puddle') { this.timer--; if(this.timer<=0) this.dead=true; if(this.timer % 20 === 0) { game.enemies.forEach(e => { if(Math.hypot(e.x-this.x, e.y-this.y) < this.r + e.r) game.damageEnemy(e, this.dmg); }); } return; }
+        if(this.type === 'dagger_slash') { this.timer--; this.x = game.player.x + (Math.cos(this.angle) * 60 * game.player.sizeMult); this.y = game.player.y + (Math.sin(this.angle) * 60 * game.player.sizeMult); if(this.timer<=0) this.dead=true; return; }
+        if(this.type === 'tea_cup') {
+            this.timer--; this.x += this.vx; this.y += this.vy;
+            if(this.timer <= 0 || (this.target && Math.hypot(this.target.x-this.x, this.target.y-this.y) < 20)) { this.dead = true; game.projectiles.push(new Projectile(this.x, this.y, null, 'tea_puddle', {dmg: this.dmg, area: 60, duration: 200})); } return;
         }
         if(this.type === 'fish') {
-            this.timer--;
-            if(this.timer < 160 && this.returnState === 0) { this.returnState = 1; }
+            this.timer--; if(this.timer < 160 && this.returnState === 0) { this.returnState = 1; }
             if(this.returnState === 1) {
-                const ang = Math.atan2(game.player.y - this.y, game.player.x - this.x);
-                this.vx += Math.cos(ang) * 0.5; this.vy += Math.sin(ang) * 0.5;
-                const l = Math.hypot(this.vx, this.vy);
-                if(l > this.speed) { this.vx = (this.vx/l)*this.speed; this.vy = (this.vy/l)*this.speed; }
+                const ang = Math.atan2(game.player.y - this.y, game.player.x - this.x); this.vx += Math.cos(ang) * 0.5; this.vy += Math.sin(ang) * 0.5;
+                const l = Math.hypot(this.vx, this.vy); if(l > this.speed) { this.vx = (this.vx/l)*this.speed; this.vy = (this.vy/l)*this.speed; }
                 if(Math.hypot(game.player.x - this.x, game.player.y - this.y) < 20) this.dead = true;
             }
         }
-        this.x += this.vx; this.y += this.vy;
-        if(this.type !== 'fish') { this.timer--; if(this.timer <= 0) this.dead = true; }
+        this.x += this.vx; this.y += this.vy; if(this.type !== 'fish') { this.timer--; if(this.timer <= 0) this.dead = true; }
     }
     draw(ctx) {
-        if(this.type === 'bomb') {
-            drawCircle(ctx, this.x, this.y, 10, '#e74c3c');
-            if(Math.floor(Date.now()/100)%2===0) ctx.fillStyle='#fff'; else ctx.fillStyle='red';
-            ctx.beginPath(); ctx.arc(this.x, this.y-5, 3, 0, Math.PI*2); ctx.fill();
-            return;
+        ctx.save();
+        if (game.player.sizeMult > 1) { ctx.translate(this.x, this.y); ctx.scale(game.player.sizeMult, game.player.sizeMult); ctx.translate(-this.x, -this.y); }
+        if(this.type === 'bomb') { drawCircle(ctx, this.x, this.y, 10, '#e74c3c'); if(Math.floor(Date.now()/100)%2===0) ctx.fillStyle='#fff'; else ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(this.x, this.y-5, 3, 0, Math.PI*2); ctx.fill(); ctx.restore(); return; }
+        if(this.type === 'tea_puddle') { ctx.fillStyle = 'rgba(160, 82, 45, 0.5)'; ctx.beginPath(); ctx.ellipse(this.x, this.y, this.r, this.r*0.6, 0, 0, Math.PI*2); ctx.fill(); ctx.restore(); return; }
+        if(this.type === 'dagger_slash') {
+             ctx.save(); ctx.translate(game.player.x, game.player.y); ctx.rotate(this.angle); 
+             ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; ctx.shadowBlur = 10; ctx.shadowColor = '#fff'; ctx.beginPath(); ctx.moveTo(10, -5); ctx.lineTo(80, 0); ctx.lineTo(10, 5); ctx.fill();
+             ctx.restore(); ctx.restore(); return;
         }
         ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
-        if(this.type==='paw') drawCircle(ctx, 0, 0, 8, '#00f0ff');
-        else if (this.type==='laser') { ctx.fillStyle='red'; ctx.fillRect(-10, -2, 20, 4); }
-        else if (this.type==='fish') { ctx.fillStyle='#fff'; ctx.font='20px serif'; ctx.fillText('🐟', -10, 5); }
-        ctx.restore();
+        if(this.type==='paw') drawCircle(ctx, 0, 0, 8, '#00f0ff'); else if (this.type==='shard') { ctx.fillStyle='#74b9ff'; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-10,-5); ctx.lineTo(-10,5); ctx.fill(); } else if (this.type==='tea_cup') { ctx.fillStyle='#fff'; ctx.fillRect(-5,-5,10,8); ctx.fillStyle='#a0522d'; ctx.fillRect(-3,-5,6,6); } else if (this.type==='fish') { ctx.fillStyle='#fff'; ctx.font='20px serif'; ctx.fillText('🐟', -10, 5); }
+        ctx.restore(); ctx.restore();
     }
 }
 
@@ -804,8 +684,7 @@ class Coin extends Entity {
     update() {
         const dist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
         if(dist < game.player.magnetRange) {
-             const ang = Math.atan2(game.player.y - this.y, game.player.x - this.x);
-             this.x += Math.cos(ang) * 12; this.y += Math.sin(ang) * 12;
+             const ang = Math.atan2(game.player.y - this.y, game.player.x - this.x); this.x += Math.cos(ang) * 12; this.y += Math.sin(ang) * 12;
              if(dist < 30) { this.dead = true; game.addCoins(1); }
         }
     }
@@ -822,456 +701,186 @@ class Pickup extends Entity {
     constructor(x, y, type) { super(x, y, 15); this.type = type; this.bob = 0; }
     update() { this.bob += 0.1; }
     draw(ctx) {
-        const yOff = Math.sin(this.bob) * 5;
-        ctx.save(); ctx.translate(this.x, this.y + yOff);
-        ctx.shadowBlur = 15; ctx.shadowColor = '#fff'; ctx.font = '24px serif';
-        let t = '📦';
-        if(this.type === 'potion') t = '❤️';
-        else if(this.type === 'magnet') t = '🧲';
-        else if(this.type === 'chest') t = '👑';
-        ctx.fillText(t, -12, 8);
-        ctx.restore();
+        const yOff = Math.sin(this.bob) * 5; ctx.save(); ctx.translate(this.x, this.y + yOff); ctx.shadowBlur = 15; ctx.shadowColor = '#fff'; ctx.font = '24px serif';
+        let t = '📦'; if(this.type === 'potion') t = '❤️'; else if(this.type === 'magnet') t = '🧲'; else if(this.type === 'chest') t = '👑';
+        ctx.fillText(t, -12, 8); ctx.restore();
     }
 }
 
-// --- GAME ENGINE ---
-
 class Game {
     constructor() {
-        this.camera = new Camera();
-        this.projectiles=[]; this.particles=[]; this.enemies=[]; this.obstacles=[];
-        this.xpOrbs=[]; this.pickups=[]; this.texts=[]; this.coinsList=[]; this.merchants=[];
-        this.time=0; this.kills=0; this.coins=0; this.bossTimer=0;
+        this.camera = new Camera(); this.projectiles=[]; this.particles=[]; this.enemies=[]; this.obstacles=[]; this.xpOrbs=[]; this.pickups=[]; this.texts=[]; this.coinsList=[]; this.merchants=[]; this.altars=[]; this.buffAltars=[]; this.time=0; this.kills=0; this.coins=0; this.bossTimer=0;
     }
-
     initWorld() {
         for(let i=0; i<10000; i++) {
-            const x = Math.random() * CONFIG.worldSize;
-            const y = Math.random() * CONFIG.worldSize;
-            if(Math.hypot(x-CONFIG.worldSize/2, y-CONFIG.worldSize/2) > 500) {
-                this.obstacles.push(new Obstacle(x, y, Math.random()>0.3?'tree':'stone'));
-            }
+            const x = Math.random() * CONFIG.worldSize; const y = Math.random() * CONFIG.worldSize;
+            if(Math.hypot(x-CONFIG.worldSize/2, y-CONFIG.worldSize/2) > 500) { this.obstacles.push(new Obstacle(x, y, Math.random()>0.3?'tree':'stone')); }
         }
         for(let i=0; i<20; i++) this.merchants.push(new Merchant());
-        this.superAltar = new SuperAltar();
+        this.altars = [new SuperAltar()];
+        this.buffAltars = [new BuffAltar('vamp'), new BuffAltar('chrono'), new BuffAltar('titan')];
     }
-
     start(type) {
-        document.getElementById('class-screen').style.display='none';
-        document.getElementById('ui-layer').style.display='block';
-        this.initWorld();
-        this.player = new Player(type);
+        document.getElementById('class-screen').style.display='none'; document.getElementById('ui-layer').style.display='block';
+        this.initWorld(); this.player = new Player(type);
         this.camera.x = this.player.x-canvas.width/2; this.camera.y = this.player.y-canvas.height/2;
         this.enemies=[]; this.projectiles=[]; this.xpOrbs=[]; this.pickups=[]; this.texts=[]; this.coinsList=[];
         this.time=0; this.startTime = Date.now(); this.lastBossTime = 0; this.kills=0; this.coins=0; this.state='PLAYING';
         this.updateHUD(); this.loop();
     }
-    
     resetGame() {
-        this.state = 'MENU';
-        document.getElementById('game-over-screen').style.display = 'none';
-        document.getElementById('ui-layer').style.display = 'none';
-        document.getElementById('class-screen').style.display = 'flex';
-        this.enemies = []; this.obstacles = []; this.projectiles = [];
+        this.state = 'MENU'; document.getElementById('game-over-screen').style.display = 'none'; document.getElementById('ui-layer').style.display = 'none'; document.getElementById('class-screen').style.display = 'flex'; this.enemies = []; this.obstacles = []; this.projectiles = [];
     }
-
     loop() {
         if(this.state !== 'PLAYING') return;
         requestAnimationFrame(()=>this.loop());
-
-        const now = Date.now();
-        this.time = (now - this.startTime) / 1000;
+        const now = Date.now(); this.time = (now - this.startTime) / 1000;
+        const mins = Math.floor(this.time/60).toString().padStart(2,'0'); const secs = Math.floor(this.time%60).toString().padStart(2,'0'); document.getElementById('game-timer').innerText = `${mins}:${secs}`;
+        this.player.update(); this.camera.follow(this.player);
         
-        const mins = Math.floor(this.time/60).toString().padStart(2,'0');
-        const secs = Math.floor(this.time%60).toString().padStart(2,'0');
-        document.getElementById('game-timer').innerText = `${mins}:${secs}`;
-
-        this.player.update();
-        this.camera.follow(this.player);
-
-        // Spawn
         const maxEnemies = 40 + Math.floor(this.time/20);
-        if(this.enemies.length < maxEnemies && Math.random() < 0.03) {
-            this.enemies.push(new Enemy(false));
-        }
+        if(this.enemies.length < maxEnemies && Math.random() < 0.03) { this.enemies.push(new Enemy(false)); }
+        if(this.time > 10 && Math.floor(this.time) % 60 === 0 && Math.floor(this.time) !== this.lastBossTime) { this.lastBossTime = Math.floor(this.time); this.spawnBoss(); }
 
-        if(this.time > 10 && Math.floor(this.time) % 60 === 0 && Math.floor(this.time) !== this.lastBossTime) {
-            this.lastBossTime = Math.floor(this.time);
-            this.spawnBoss();
-        }
-
-        this.superAltar.update();
+        this.altars.forEach(a => a.update()); this.buffAltars.forEach(a => a.update());
         [this.projectiles, this.enemies, this.particles, this.xpOrbs, this.coinsList, this.pickups, this.merchants, this.texts].forEach(arr => arr.forEach(e => e.update()));
-
         this.checkCollisions();
         
-        this.projectiles=this.projectiles.filter(x=>!x.dead);
-        this.enemies=this.enemies.filter(x=>!x.dead);
-        this.particles=this.particles.filter(x=>!x.dead);
-        this.xpOrbs=this.xpOrbs.filter(x=>!x.dead);
-        this.coinsList=this.coinsList.filter(x=>!x.dead);
-        this.pickups=this.pickups.filter(x=>!x.dead);
-        this.merchants=this.merchants.filter(x=>!x.dead);
-        this.texts=this.texts.filter(x=>!x.dead);
-
-        this.draw();
-        this.drawMinimap();
+        this.projectiles=this.projectiles.filter(x=>!x.dead); this.enemies=this.enemies.filter(x=>!x.dead); this.particles=this.particles.filter(x=>!x.dead); this.xpOrbs=this.xpOrbs.filter(x=>!x.dead); this.coinsList=this.coinsList.filter(x=>!x.dead); this.pickups=this.pickups.filter(x=>!x.dead); this.merchants=this.merchants.filter(x=>!x.dead); this.texts=this.texts.filter(x=>!x.dead);
+        this.draw(); this.drawMinimap();
     }
-    
-    spawnBoss() {
-        this.enemies.push(new Enemy(true));
-        this.texts.push(new FloatingText(this.player.x, this.player.y-80, "☠️ БОСС ПРИШЕЛ! ☠️", "red"));
-    }
-    
-    spawnSuperBoss(x, y) {
-        const boss = new Enemy(false, true, x, y);
-        this.enemies.push(boss);
-        this.texts.push(new FloatingText(x, y-100, "☠️ ЛИЧ ПРОБУДИЛСЯ ☠️", "#e056fd"));
-    }
-
-    createExplosion(x, y, r, dmg, color) {
-        for(let i=0; i<10; i++) this.particles.push(new Particle(x + (Math.random()-0.5)*r, y + (Math.random()-0.5)*r, color));
-        this.enemies.forEach(e => {
-            if(Math.hypot(e.x-x, e.y-y) < r + e.r) this.damageEnemy(e, dmg);
-        });
-    }
-
+    spawnBoss() { this.enemies.push(new Enemy(true)); this.texts.push(new FloatingText(this.player.x, this.player.y-80, "☠️ БОСС ПРИШЕЛ! ☠️", "red")); }
+    spawnSuperBoss(x, y) { const boss = new Enemy(false, true, x, y); this.enemies.push(boss); this.texts.push(new FloatingText(x, y-100, "☠️ ЛИЧ ПРОБУДИЛСЯ ☠️", "#e056fd")); }
+    createExplosion(x, y, r, dmg, color) { for(let i=0; i<10; i++) this.particles.push(new Particle(x + (Math.random()-0.5)*r, y + (Math.random()-0.5)*r, color)); this.enemies.forEach(e => { if(Math.hypot(e.x-x, e.y-y) < r + e.r) this.damageEnemy(e, dmg); }); }
     checkCollisions() {
         this.enemies.forEach(e => {
-            if(Math.hypot(this.player.x-e.x, this.player.y-e.y) < this.player.r+e.r) {
-                const dmg = Math.max(1, 10 - this.player.armor);
-                this.player.hp -= dmg * 0.05;
-                this.updateHUD();
-                if(this.player.hp<=0) this.gameOver();
+            const dist = Math.hypot(this.player.x-e.x, this.player.y-e.y); const minDist = this.player.r + e.r;
+            if(dist < minDist) {
+                const dmg = Math.max(1, 10 - this.player.armor); this.player.hp -= dmg * 0.05;
+                const angle = Math.atan2(this.player.y - e.y, this.player.x - e.x); const pushDist = minDist - dist; 
+                this.player.x += Math.cos(angle) * pushDist; this.player.y += Math.sin(angle) * pushDist;
+                this.updateHUD(); if(this.player.hp<=0) this.gameOver();
             }
         });
         this.projectiles.forEach(p => {
             this.enemies.forEach(e => {
                 if(Math.hypot(p.x-e.x, p.y-e.y) < p.r+e.r) {
-                    this.damageEnemy(e, p.dmg);
-                    if(p.type!=='garlic' && p.type!=='bomb') p.dead=true;
+                    if(p.type === 'dagger_slash' || p.type === 'tea_puddle') { game.damageEnemy(e, p.dmg); }
+                    else { this.damageEnemy(e, p.dmg); if(p.type!=='garlic' && p.type!=='bomb' && p.type!=='shard') p.dead=true; }
                 }
             });
         });
-        this.pickups.forEach(p => {
-             if(Math.hypot(this.player.x-p.x, this.player.y-p.y) < this.player.r+p.r) {
-                 this.collectPickup(p); p.dead = true;
-             }
-        });
+        this.pickups.forEach(p => { if(Math.hypot(this.player.x-p.x, this.player.y-p.y) < this.player.r+p.r) { this.collectPickup(p); p.dead = true; } });
     }
-
     damageEnemy(e, rawDmg) {
-        const armor = Math.max(0, e.armor - this.player.armorPen);
-        const actualDmg = Math.max(1, rawDmg - armor);
-        e.hp -= actualDmg;
+        const armor = Math.max(0, e.armor - this.player.armorPen); const actualDmg = Math.max(1, rawDmg - armor); e.hp -= actualDmg;
         this.texts.push(new FloatingText(e.x, e.y-e.r, Math.floor(actualDmg), '#fff'));
-        
         if(e.hp<=0 && !e.dead) {
             e.dead = true; this.kills++;
+            if(this.player.vampirism && Math.random() < 0.3) { this.player.hp = Math.min(this.player.maxHp, this.player.hp + 1); this.updateHUD(); }
             this.coinsList.push(new Coin(e.x, e.y));
-            if(e.isSuperBoss) {
-                this.pickups.push(new Pickup(e.x, e.y, 'chest')); // Mega Chest
-                this.player.weapons.forEach(w => { w.stats.dmg *= 5; w.stats.size *= 1.5; }); // Divine Power
-                this.texts.push(new FloatingText(e.x, e.y, "БОЖЕСТВЕННАЯ СИЛА!", "gold"));
-            } else if(e.isBoss) {
-                this.pickups.push(new Pickup(e.x, e.y, 'chest'));
-            } else {
-                this.xpOrbs.push({x: e.x, y: e.y, val: e.xp, dead:false, update: function(){
-                    if(Math.hypot(game.player.x-this.x, game.player.y-this.y) < game.player.magnetRange) {
-                        this.x += (game.player.x-this.x)*0.15; this.y += (game.player.y-this.y)*0.15;
-                        if(Math.hypot(game.player.x-this.x, game.player.y-this.y) < 20) { this.dead=true; game.addXP(this.val); }
-                    }
-                }, draw: function(ctx){ ctx.fillStyle='#2ed573'; ctx.beginPath(); ctx.arc(this.x,this.y,4,0,Math.PI*2); ctx.fill(); }});
-                
-                if(Math.random() < 0.02) this.pickups.push(new Pickup(e.x, e.y, Math.random()>0.5?'potion':'magnet'));
-            }
-            this.particles.push(new Particle(e.x, e.y, '#fff'));
-            this.updateHUD();
+            if(e.isSuperBoss) { this.pickups.push(new Pickup(e.x, e.y, 'chest')); this.player.weapons.forEach(w => { w.stats.dmg *= 5; w.stats.size *= 1.5; }); this.texts.push(new FloatingText(e.x, e.y, "БОЖЕСТВЕННАЯ СИЛА!", "gold")); }
+            else if(e.isBoss) { this.pickups.push(new Pickup(e.x, e.y, 'chest')); }
+            else { this.xpOrbs.push(new XPOrb(e.x, e.y, e.xp)); if(Math.random() < 0.02) this.pickups.push(new Pickup(e.x, e.y, Math.random()>0.5?'potion':'magnet')); }
+            this.particles.push(new Particle(e.x, e.y, '#fff')); this.updateHUD();
         }
     }
-
-    addXP(v) {
-        this.player.xp+=v;
-        if(this.player.xp >= this.player.xpNext) {
-            this.player.xp -= this.player.xpNext; this.player.lvl++; this.player.xpNext=Math.floor(this.player.xpNext*1.5);
-            this.triggerLevelUp();
-        }
-        this.updateHUD();
-    }
-    
+    addXP(v) { this.player.xp+=v; if(this.player.xp >= this.player.xpNext) { this.player.xp -= this.player.xpNext; this.player.lvl++; this.player.xpNext=Math.floor(this.player.xpNext*1.5); this.triggerLevelUp(); } this.updateHUD(); }
     addCoins(v) { this.coins += v; this.updateHUD(); }
     getNearestEnemy(s, r) { let n=null, md=r; this.enemies.forEach(e=>{const d=Math.hypot(s.x-e.x, s.y-e.y); if(d<md){md=d; n=e;}}); return n; }
-
-    // --- UI ---
-
     updateHUD() {
-        document.getElementById('hp-bar').style.width = Math.max(0, (this.player.hp/this.player.maxHp)*100)+'%';
-        document.getElementById('hp-text').innerText = `${Math.floor(this.player.hp)}/${this.player.maxHp}`;
-        document.getElementById('xp-bar').style.width = Math.max(0, (this.player.xp/this.player.xpNext)*100)+'%';
-        document.getElementById('lvl-text').innerText = `LVL ${this.player.lvl}`;
-        document.getElementById('coin-count').innerText = `💰 ${this.coins}`;
-        document.getElementById('kill-count').innerText = `💀 ${this.kills}`;
+        document.getElementById('hp-bar').style.width = Math.max(0, (this.player.hp/this.player.maxHp)*100)+'%'; document.getElementById('hp-text').innerText = `${Math.floor(this.player.hp)}/${this.player.maxHp}`;
+        document.getElementById('xp-bar').style.width = Math.max(0, (this.player.xp/this.player.xpNext)*100)+'%'; document.getElementById('lvl-text').innerText = `LVL ${this.player.lvl}`;
+        document.getElementById('coin-count').innerText = `💰 ${this.coins}`; document.getElementById('kill-count').innerText = `💀 ${this.kills}`;
     }
-
     collectPickup(p) {
-        const msg = document.getElementById('pickup-msg');
-        msg.style.opacity = 1; setTimeout(()=>msg.style.opacity=0, 1500);
+        const msg = document.getElementById('pickup-msg'); msg.style.opacity = 1; setTimeout(()=>msg.style.opacity=0, 1500);
         if(p.type==='potion') { this.player.hp = Math.min(this.player.maxHp, this.player.hp + 50); msg.innerText="+50 HP"; }
-        if(p.type==='magnet') { this.xpOrbs.forEach(o => { o.x=this.player.x; o.y=this.player.y; }); msg.innerText="МАГНИТ!"; }
-        if(p.type==='chest') { this.triggerLevelUp(false, true); }
-        this.updateHUD();
+        if(p.type==='magnet') { this.xpOrbs.forEach(o => { o.magnetized = true; }); msg.innerText="МАГНИТ!"; }
+        if(p.type==='chest') { this.triggerLevelUp(false, true); } this.updateHUD();
     }
-
     openShop(merchant) {
-        this.state = 'PAUSED';
-        this.currentMerchant = merchant; 
-        const scr = document.getElementById('shop-screen');
-        const cont = document.getElementById('shop-cards');
-        document.getElementById('shop-coins').innerText = `Монеты: ${this.coins}`;
-        cont.innerHTML = '';
-        scr.style.display = 'flex';
-        
-        const items = [
-            { name: 'Лечение', cost: 10, icon: '❤️', desc: '+50 HP', act:()=>{this.player.hp+=50;} },
-            { name: 'Сила', cost: 50, icon: '⚔️', desc: '+10% Урона', act:()=>{this.player.weapons.forEach(w=>w.stats.dmg=Math.ceil(w.stats.dmg*1.1));} },
-            { name: 'Броня', cost: 40, icon: '🛡️', desc: '+2 Брони', act:()=>{this.player.armor+=2;} },
-            { name: 'Пробитие', cost: 60, icon: '🏹', desc: '+5 Пробития', act:()=>{this.player.armorPen+=5;} }
-        ];
-
+        if (this.state === 'PAUSED') return; this.state = 'PAUSED'; this.currentMerchant = merchant; 
+        const scr = document.getElementById('shop-screen'); const cont = document.getElementById('shop-cards'); document.getElementById('shop-coins').innerText = `Монеты: ${this.coins}`; cont.innerHTML = ''; scr.style.display = 'flex';
+        const items = [ { name: 'Лечение', cost: 10, icon: '❤️', desc: '+50 HP', act:()=>{this.player.hp+=50;} }, { name: 'Сила', cost: 50, icon: '⚔️', desc: '+10% Урона', act:()=>{this.player.weapons.forEach(w=>w.stats.dmg=Math.ceil(w.stats.dmg*1.1));} }, { name: 'Броня', cost: 40, icon: '🛡️', desc: '+2 Брони', act:()=>{this.player.armor+=2;} }, { name: 'Пробитие', cost: 60, icon: '🏹', desc: '+5 Пробития', act:()=>{this.player.armorPen+=5;} } ];
         items.forEach(i => {
-            const el = document.createElement('div');
-            el.className = 'card';
-            el.innerHTML = `<span class="card-icon">${i.icon}</span><div class="card-title">${i.name}</div><div class="card-desc">${i.desc}</div><div class="cost-badge">💰 ${i.cost}</div>`;
-            el.onclick = () => {
-                if(this.coins >= i.cost) {
-                    this.coins -= i.cost;
-                    i.act();
-                    this.closeShop(true); 
-                }
-            };
-            cont.appendChild(el);
+            const el = document.createElement('div'); el.className = 'card'; el.innerHTML = `<span class="card-icon">${i.icon}</span><div class="card-title">${i.name}</div><div class="card-desc">${i.desc}</div><div class="cost-badge">💰 ${i.cost}</div>`;
+            el.onclick = () => { if(this.coins >= i.cost) { this.coins -= i.cost; i.act(); cont.innerHTML = ''; this.closeShop(true); } }; cont.appendChild(el);
         });
     }
-
     closeShop(purchased) {
-        document.getElementById('shop-screen').style.display = 'none';
-        this.state = 'PLAYING';
-        this.startTime = Date.now() - (this.time * 1000); 
-        if(purchased && this.currentMerchant) { this.currentMerchant.dead = true; } 
-        else { this.player.x += 80; }
-        this.loop();
+        document.getElementById('shop-screen').style.display = 'none'; this.state = 'PLAYING'; this.startTime = Date.now() - (this.time * 1000); 
+        if(purchased && this.currentMerchant) { this.currentMerchant.dead = true; } else { this.player.x += 80; } this.loop();
     }
-
     triggerLevelUp(isAltar=false, isChest=false) {
-        this.state = 'PAUSED';
-        const scr = document.getElementById('upgrade-screen');
-        const cont = document.getElementById('upgrade-cards');
-        cont.innerHTML = '';
-        scr.style.display = 'flex';
-
-        const weaponPool = [
-            { id: 'paw', name: 'Лапа', desc: 'Урон и КД', type: 'weapon', stat1:'dmg', stat2:'cd' },
-            { id: 'yarn', name: 'Клубок', desc: 'Скорость и Кол-во', type: 'weapon', stat1:'speed', stat2:'count' },
-            { id: 'laser', name: 'Лазер', desc: 'Быстрые выстрелы', type: 'weapon', stat1:'cd', stat2:'dmg' },
-            { id: 'fish', name: 'Кость', desc: 'Бумеранг', type: 'weapon', stat1:'dmg', stat2:'speed' },
-            { id: 'bomb_weapon', name: 'Мята', desc: 'Взрыв', type: 'weapon', stat1:'area', stat2:'dmg' },
-            { id: 'shadow_claws', name: 'Тень', desc: 'Ближний AOE', type: 'weapon', stat1:'area', stat2:'cd' },
-            { id: 'water', name: 'Брызги', desc: 'Отталкивание', type: 'weapon', stat1:'count', stat2:'speed' },
-            { id: 'garlic', name: 'Аура', desc: 'Зона урона', type: 'weapon', stat1:'area', stat2:'dmg' }
-        ];
+        this.state = 'PAUSED'; const scr = document.getElementById('upgrade-screen'); const cont = document.getElementById('upgrade-cards'); cont.innerHTML = ''; scr.style.display = 'flex';
+        const pool = [];
+        this.player.weapons.forEach(w => { pool.push({ type:'weapon', id:w.id, name:w.name, desc: 'Боевая Мощь', icon:w.icon, stat1: 'dmg', stat2: 'cd' }); pool.push({ type:'weapon', id:w.id, name:w.name, desc: 'Мастерство', icon:w.icon, stat1: 'speed', stat2: 'area' }); });
+        if(this.player.weapons.length < 4) {
+            const allWeapons = [ { id: 'paw', name: 'Лапа', desc: 'Урон и КД', type: 'weapon' }, { id: 'yarn', name: 'Клубок', desc: 'Скорость', type: 'weapon' }, { id: 'blizzard', name: 'Вьюга', desc: 'Осколки', type: 'weapon' }, { id: 'tea', name: 'Чай', desc: 'Лужи', type: 'weapon' }, { id: 'dagger', name: 'Кортик', desc: 'Ближний', type: 'weapon' }, { id: 'fish', name: 'Кость', desc: 'Бумеранг', type: 'weapon' }, { id: 'bomb_weapon', name: 'Мята', desc: 'Взрыв', type: 'weapon' }, { id: 'shadow_claws', name: 'Тень', desc: 'AOE', type: 'weapon' }, { id: 'garlic', name: 'Аура', desc: 'Зона', type: 'weapon' } ];
+            allWeapons.forEach(w => { if(!this.player.weapons.find(pw => pw.id === w.id)) { w.icon = '🆕'; pool.push(w); } });
+        }
+        const statOpts = [ { id: 'multi', name: 'Мульти', desc: '+1 Снаряд', type: 'stat', icon: '✨' }, { id: 'pen', name: 'Острие', desc: '+5 Пробития', type: 'stat', icon: '🔪' }, { id: 'heal', name: 'Еда', desc: '+Полное HP', type: 'stat', icon: '🍗' } ];
+        statOpts.forEach(s => pool.push(s));
         
-        const statPool = [
-            { id: 'multi', name: 'Мульти', desc: '+1 Снаряд всем', type: 'stat', icon: '✨' },
-            { id: 'pen', name: 'Острие', desc: '+5 Пробития', type: 'stat', icon: '🔪' },
-            { id: 'area', name: 'Область', desc: '+10% Размера', type: 'stat', icon: '📡' },
-            { id: 'heal', name: 'Еда', desc: '+Полное HP', type: 'stat', icon: '🍗' },
-            { id: 'magnet', name: 'Магнит', desc: '+50 Радиус сбора', type: 'stat', icon: '🧲' }
-        ];
+        const pickedIds = new Set();
 
         for(let i=0; i<3; i++) {
-            const isRare = Math.random() < 0.15 || isChest; 
-            const r = Math.random();
-            let opt;
+            if(pool.length === 0) break;
             
-            if(this.player.weapons.length < 4 && r > 0.4) {
-                 opt = weaponPool[Math.floor(Math.random()*weaponPool.length)];
-            } else {
-                 if(Math.random() > 0.5 && this.player.weapons.length > 0) {
-                     const w = this.player.weapons[Math.floor(Math.random()*this.player.weapons.length)];
-                     opt = weaponPool.find(x => x.id === w.id);
-                 } else {
-                     opt = statPool[Math.floor(Math.random()*statPool.length)];
-                 }
-            }
-            
-            const el = document.createElement('div');
-            el.className = 'card' + (isRare ? ' rare' : '') + (isChest ? ' mega' : '');
-            let title = opt.name; let desc = opt.desc; let icon = opt.icon || '⚔️';
-            if(opt.type==='weapon') {
-                const wProto = new Weapon(opt.id, null); icon = wProto.icon;
-                const has = this.player.weapons.find(x=>x.id===opt.id); if(!has) title += " (NEW!)";
-            }
-            if(isRare) { desc = "Двойное улучшение!"; }
-            if(isChest) { desc = "ТРОЙНАЯ СИЛА!"; }
+            // Reroll logic
+            let idx, opt, attempts=0;
+            do {
+                idx = Math.floor(Math.random() * pool.length);
+                opt = pool[idx];
+                attempts++;
+            } while(pickedIds.has(opt.id + opt.stat1) && attempts < 20); // Check unique ID+Stat combo
 
+            pickedIds.add(opt.id + opt.stat1);
+            
+            const isRare = Math.random() < 0.07 || isChest; const el = document.createElement('div'); el.className = 'card' + (isRare ? ' rare' : '') + (isChest ? ' mega' : '');
+            let title = opt.name; let desc = opt.desc; let icon = opt.icon || '⚔️'; if(opt.type==='weapon' && !opt.stat1) title += " (NEW!)"; if(isRare) desc = "Двойное улучшение!"; if(isChest) desc = "ТРОЙНАЯ СИЛА!";
             el.innerHTML = `<span class="card-icon">${icon}</span><div class="card-title">${title}</div><div class="card-desc">${desc}</div>${isRare?'<div class="rare-badge">RARE</div>':''}`;
             el.onclick = () => {
-                if(opt.type === 'stat') {
-                    if(opt.id==='multi') this.player.globalCount += (isRare?2:1);
-                    if(opt.id==='pen') this.player.armorPen += (isRare?10:5);
-                    if(opt.id==='area') this.player.areaMod += (isRare?0.2:0.1);
-                    if(opt.id==='heal') this.player.hp = this.player.maxHp;
-                    if(opt.id==='magnet') this.player.magnetRange += (isRare?100:50);
-                } else {
-                    const added = this.player.addWeapon(opt.id, isChest);
-                    if(added && !isChest) {
-                        const w = this.player.weapons.find(x=>x.id===opt.id);
-                        if(w) {
-                            if(isRare) w.upgrade(opt.stat1, opt.stat2); 
-                            else w.upgrade(Math.random()>0.5 ? opt.stat1 : opt.stat2);
-                        }
-                    }
-                }
-                this.player.updateWeaponUI();
-                scr.style.display = 'none';
-                this.state = 'PLAYING';
-                this.startTime = Date.now() - (this.time * 1000);
-                this.loop();
-            };
-            cont.appendChild(el);
+                if(opt.type === 'stat') { if(opt.id==='multi') this.player.globalCount += (isRare?2:1); if(opt.id==='pen') this.player.armorPen += (isRare?10:5); if(opt.id==='heal') this.player.hp = this.player.maxHp; }
+                else { const added = this.player.addWeapon(opt.id, isChest); if(added && !isChest) { const w = this.player.weapons.find(x=>x.id===opt.id); if(w) { if(isRare) w.upgrade(opt.stat1, opt.stat2); else w.upgrade(Math.random()>0.5 ? opt.stat1 : opt.stat2); } } }
+                this.player.updateWeaponUI(); scr.style.display = 'none'; this.state = 'PLAYING'; this.startTime = Date.now() - (this.time * 1000); this.loop();
+            }; cont.appendChild(el);
         }
     }
-
-    gameOver() {
-        this.state = 'GAMEOVER';
-        document.getElementById('game-over-screen').style.display='flex';
-        document.getElementById('ui-layer').style.display='none';
-        const mins = Math.floor(this.time/60);
-        const secs = Math.floor(this.time%60);
-        document.getElementById('go-stats').innerHTML = `Выжито: ${mins}:${secs}<br>Убито: ${this.kills}`;
-    }
-
+    gameOver() { this.state = 'GAMEOVER'; document.getElementById('game-over-screen').style.display='flex'; document.getElementById('ui-layer').style.display='none'; const mins = Math.floor(this.time/60); const secs = Math.floor(this.time%60); document.getElementById('go-stats').innerHTML = `Выжито: ${mins}:${secs}<br>Убито: ${this.kills}`; }
     draw() {
         ctx.fillStyle = CONFIG.colors.grass; ctx.fillRect(0,0,canvas.width,canvas.height);
-        
         ctx.save(); ctx.translate(-this.camera.x, -this.camera.y);
-        
-        // Bounds
         ctx.strokeStyle = '#e74c3c'; ctx.lineWidth=10; ctx.strokeRect(0,0,CONFIG.worldSize,CONFIG.worldSize);
-        
-        // Dense Grass Drawing
-        const cx=this.camera.x, cy=this.camera.y;
-        const sx=Math.floor(cx/50)*50, sy=Math.floor(cy/50)*50;
+        const cx=this.camera.x, cy=this.camera.y; const sx=Math.floor(cx/50)*50, sy=Math.floor(cy/50)*50;
         ctx.fillStyle = CONFIG.colors.grassDark;
-        for(let x=sx; x<cx+canvas.width; x+=50) {
-            for(let y=sy; y<cy+canvas.height; y+=50) {
-                // Deterministic noise
-                if((x*y)%7 === 0) {
-                    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+5,y-10); ctx.lineTo(x+10,y); ctx.fill();
-                }
-            }
-        }
-        
-        // Altar (Bottom layer)
-        this.superAltar.draw(ctx);
-
-        const list = [
-            ...this.obstacles.filter(o => o && o.isVisible(cx,cy)),
-            ...this.merchants.filter(m => m.isVisible(cx,cy)),
-            ...this.xpOrbs, ...this.pickups, ...this.coinsList,
-            ...this.projectiles, ...this.enemies.filter(e => e.isVisible(cx,cy)),
-            this.player, ...this.particles, ...this.texts
-        ];
-        
-        list.sort((a,b)=>a.y-b.y);
-        list.forEach(e=>e.draw(ctx));
-
+        for(let x=sx; x<cx+canvas.width; x+=50) { for(let y=sy; y<cy+canvas.height; y+=50) { if((x*y)%7 === 0) { ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+5,y-10); ctx.lineTo(x+10,y); ctx.fill(); } } }
+        this.altars.forEach(a => a.draw(ctx)); this.buffAltars.forEach(a => a.draw(ctx));
+        const list = [ ...this.obstacles.filter(o => o && o.isVisible(cx,cy)), ...this.merchants.filter(m => m.isVisible(cx,cy)), ...this.xpOrbs, ...this.pickups, ...this.coinsList, ...this.projectiles, ...this.enemies.filter(e => e.isVisible(cx,cy)), this.player, ...this.particles, ...this.texts ];
+        list.sort((a,b)=>a.y-b.y); list.forEach(e=>e.draw(ctx));
         ctx.restore();
     }
-    
     drawMinimap() {
-        // RADAR MAP
-        miniCtx.clearRect(0, 0, 200, 200);
-        miniCtx.translate(100, 100); // Center map
-        
-        // Map Scale: 200px represents 2000 units radius
-        const radarScale = 0.05; 
-        const radarRadius = 100;
-
-        const drawBlip = (tx, ty, color, size) => {
-            let dx = (tx - this.player.x) * radarScale;
-            let dy = (ty - this.player.y) * radarScale;
-            const dist = Math.hypot(dx, dy);
-            
-            // If out of radar range
+        miniCtx.clearRect(0, 0, 200, 200); miniCtx.translate(100, 100); 
+        const radarScale = 0.05; const radarRadius = 100;
+        const drawBlip = (tx, ty, color, size, showArrow) => {
+            let dx = (tx - this.player.x) * radarScale; let dy = (ty - this.player.y) * radarScale; const dist = Math.hypot(dx, dy);
             if (dist > radarRadius - 5) {
-                // Draw Arrow on edge
-                const angle = Math.atan2(dy, dx);
-                dx = Math.cos(angle) * (radarRadius - 10);
-                dy = Math.sin(angle) * (radarRadius - 10);
-                
-                // Draw Arrow
-                miniCtx.fillStyle = color;
-                miniCtx.beginPath();
-                miniCtx.moveTo(dx + Math.cos(angle)*5, dy + Math.sin(angle)*5);
-                miniCtx.lineTo(dx + Math.cos(angle + 2.5)*8, dy + Math.sin(angle + 2.5)*8);
-                miniCtx.lineTo(dx + Math.cos(angle - 2.5)*8, dy + Math.sin(angle - 2.5)*8);
-                miniCtx.fill();
-                return;
+                if (!showArrow) return; const angle = Math.atan2(dy, dx); dx = Math.cos(angle) * (radarRadius - 10); dy = Math.sin(angle) * (radarRadius - 10);
+                miniCtx.fillStyle = color; miniCtx.beginPath(); miniCtx.moveTo(dx + Math.cos(angle)*5, dy + Math.sin(angle)*5); miniCtx.lineTo(dx + Math.cos(angle + 2.5)*8, dy + Math.sin(angle + 2.5)*8); miniCtx.lineTo(dx + Math.cos(angle - 2.5)*8, dy + Math.sin(angle - 2.5)*8); miniCtx.fill(); return;
             }
-
-            miniCtx.fillStyle = color;
-            miniCtx.beginPath();
-            miniCtx.arc(dx, dy, size, 0, Math.PI*2);
-            miniCtx.fill();
+            miniCtx.fillStyle = color; miniCtx.beginPath(); miniCtx.arc(dx, dy, size, 0, Math.PI*2); miniCtx.fill();
         };
-
-        // Draw Player (Center)
-        miniCtx.fillStyle = '#fff';
-        miniCtx.beginPath(); miniCtx.arc(0, 0, 3, 0, Math.PI*2); miniCtx.fill();
-
-        // Draw Entities relative to player
-        
-        // Altar
-        drawBlip(this.superAltar.x, this.superAltar.y, '#e056fd', 6);
-        
-        // Enemies (Only bosses get arrows, normal dots stay inside)
-        this.enemies.forEach(e => {
-            if(e.isBoss || e.isSuperBoss) drawBlip(e.x, e.y, 'red', 5);
-            else {
-                // Simple dot for normal enemies, no arrows
-                let dx = (e.x - this.player.x) * radarScale;
-                let dy = (e.y - this.player.y) * radarScale;
-                if(Math.hypot(dx,dy) < radarRadius) {
-                    miniCtx.fillStyle = 'rgba(231, 76, 60, 0.8)';
-                    miniCtx.beginPath(); miniCtx.arc(dx, dy, 2, 0, Math.PI*2); miniCtx.fill();
-                }
-            }
-        });
-
-        // Pickups/Merchants
-        this.merchants.forEach(m => drawBlip(m.x, m.y, '#f1c40f', 4));
-        this.pickups.forEach(p => {
-             let dx = (p.x - this.player.x) * radarScale;
-             let dy = (p.y - this.player.y) * radarScale;
-             if(Math.hypot(dx,dy) < radarRadius) {
-                 miniCtx.fillStyle = 'yellow';
-                 miniCtx.fillRect(dx-1, dy-1, 3, 3);
-             }
-        });
-        
-        // Obstacles (faint dots)
-        this.obstacles.forEach(o => {
-             if(!o) return;
-             let dx = (o.x - this.player.x) * radarScale;
-             let dy = (o.y - this.player.y) * radarScale;
-             if(Math.hypot(dx,dy) < radarRadius) {
-                 miniCtx.fillStyle = 'rgba(255,255,255,0.2)';
-                 miniCtx.beginPath(); miniCtx.arc(dx, dy, 1, 0, Math.PI*2); miniCtx.fill();
-             }
-        });
-
-        miniCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset
+        miniCtx.fillStyle = '#fff'; miniCtx.beginPath(); miniCtx.arc(0, 0, 3, 0, Math.PI*2); miniCtx.fill();
+        this.altars.forEach(a => { if(a.active) drawBlip(a.x, a.y, '#e056fd', 6, true); });
+        this.buffAltars.forEach(a => { if(a.active) drawBlip(a.x, a.y, a.color, 5, false); });
+        this.enemies.forEach(e => { if(e.isBoss || e.isSuperBoss) drawBlip(e.x, e.y, 'red', 5, true); else { let dx = (e.x - this.player.x) * radarScale; let dy = (e.y - this.player.y) * radarScale; if(Math.hypot(dx,dy) < radarRadius) { miniCtx.fillStyle = 'rgba(231, 76, 60, 0.8)'; miniCtx.beginPath(); miniCtx.arc(dx, dy, 2, 0, Math.PI*2); miniCtx.fill(); } } });
+        // Merchant is ORANGE on minimap
+        this.merchants.forEach(m => drawBlip(m.x, m.y, '#e67e22', 4, false)); 
+        this.pickups.forEach(p => { let dx = (p.x - this.player.x) * radarScale; let dy = (p.y - this.player.y) * radarScale; if(Math.hypot(dx,dy) < radarRadius) { miniCtx.fillStyle = 'yellow'; miniCtx.fillRect(dx-1, dy-1, 3, 3); } });
+        this.obstacles.forEach(o => { if(!o) return; let dx = (o.x - this.player.x) * radarScale; let dy = (o.y - this.player.y) * radarScale; if(Math.hypot(dx,dy) < radarRadius) { miniCtx.fillStyle = 'rgba(255,255,255,0.2)'; miniCtx.beginPath(); miniCtx.arc(dx, dy, 1, 0, Math.PI*2); miniCtx.fill(); } });
+        miniCtx.setTransform(1, 0, 0, 1, 0, 0); 
     }
 }
 
